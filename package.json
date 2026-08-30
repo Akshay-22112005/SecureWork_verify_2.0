@@ -1,0 +1,26 @@
+{
+  "name": "securework-verify",
+  "version": "0.1.0",
+  "private": true,
+  "description": "SecureWork Verify - Cryptographically verifiable workforce credential and qualification verification platform",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n \"BACKEND,FRONTEND\" -c \"blue.bold,green.bold\" \"npm run dev --workspace=backend\" \"npm run dev --workspace=frontend\"",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "build": "npm run build --workspace=frontend",
+    "test": "npm run test --workspace=backend",
+    "verify": "node scripts/verify-foundation.js"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "SecureWork Verify Team",
+  "license": "UNLICENSED"
+}

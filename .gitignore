@@ -1,0 +1,69 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Environment and Secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+*.crt
+id_rsa
+id_rsa.pub
+
+# SecureWork Verify Key Isolation
+backend/keys/*
+!backend/keys/.gitkeep
+
+# SecureWork Verify Document Storage & Temp Files
+backend/storage/documents/*
+!backend/storage/documents/.gitkeep
+backend/storage/temp/*
+!backend/storage/temp/.gitkeep
+
+# Build and Distribution Artifacts
+dist/
+dist-ssr/
+build/
+*.tsbuildinfo
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Testing & Coverage
+coverage/
+.nyc_output/
+
+# Database dumps and local database files
+*.dump
+*.sql
+*.sqlite
+*.sqlite3
+mongo-data/
+
+# Machine Learning / AI Model Weights (Large binaries)
+*.bin
+*.onnx
+*.pt
+*.pth
+*.safetensors
+*.ckpt
+*.tflite
+models/checkpoints/
+
+# System & Editor Files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
