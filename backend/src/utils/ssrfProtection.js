@@ -52,6 +52,12 @@ function isPrivateOrBlockedIp(ip) {
     // 169.254.0.0/16 (Link-local & Cloud Metadata: 169.254.169.254)
     if (b0 === 169 && b1 === 254) return true;
 
+    // 100.64.0.0/10 (Carrier-Grade NAT / Shared Address Space RFC 6598)
+    if (b0 === 100 && b1 >= 64 && b1 <= 127) return true;
+
+    // 198.18.0.0/15 (Network Benchmark Testing RFC 2544)
+    if (b0 === 198 && (b1 === 18 || b1 === 19)) return true;
+
     // 224.0.0.0/4 (Multicast) & 255.255.255.255 (Broadcast)
     if (b0 >= 224) return true;
   }

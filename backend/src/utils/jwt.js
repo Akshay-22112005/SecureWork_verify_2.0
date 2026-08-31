@@ -17,18 +17,22 @@ function generateToken(user, options = {}) {
   };
 
   return jwt.sign(payload, env.JWT_SECRET, {
+    algorithm: 'HS256',
     expiresIn: options.expiresIn || env.JWT_EXPIRES_IN
   });
 }
 
 /**
  * Verifies and decodes a JWT using the application secret.
+ * Explicitly enforces HMAC-SHA256 algorithm to prevent algorithm confusion attacks.
  * @param {string} token - Raw JWT string
  * @returns {object} Decoded token payload
  * @throws {jwt.JsonWebTokenError | jwt.TokenExpiredError}
  */
 function verifyToken(token) {
-  return jwt.verify(token, env.JWT_SECRET);
+  return jwt.verify(token, env.JWT_SECRET, {
+    algorithms: ['HS256']
+  });
 }
 
 module.exports = {

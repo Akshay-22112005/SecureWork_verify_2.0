@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --test --test-concurrency=1 tests/*.test.js",
-    "seed:admin": "node src/scripts/seedAdmin.js"
+    "seed:admin": "node src/scripts/seedAdmin.js",
+    "demo": "node src/scripts/demo.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

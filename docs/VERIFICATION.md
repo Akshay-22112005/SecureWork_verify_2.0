@@ -1,80 +1,101 @@
-# Multi-Phase Verification Pipeline
+# Multi-Dimensional Verification Engine Specification
 
 ## 1. Pipeline Overview
 
-Verification in SecureWork Verify is deterministic, fail-fast, and executes through five distinct evaluation gates.
+Verification in SecureWork Verify is deterministic, fail-fast, and executes through **16 discrete verification gates** synthesizing evidence across cryptographic proof, registry authority, documentary match, identity binding, and advisory heuristics into **6 distinct trust levels**.
 
 ```mermaid
 flowchart TD
-    Start([Verification Request Received]) --> Gate1{Gate 1: Schema & Syntax Validation}
-    Gate1 -- Invalid --> Fail[Return Failure with Detailed Error]
-    Gate1 -- Valid --> Gate2{Gate 2: Cryptographic Signature Verification}
+    Start([Verification Request Received]) --> Gate1[Gate 1: Organization Existence & Status]
+    Gate1 --> Gate2[Gate 2: Issuer Authority & Accreditation]
+    Gate2 --> Gate3[Gate 3: Issuer Key Lifecycle & Compromise Window]
+    Gate3 --> Gate4[Gate 4: Document Hash / Byte-Level Match]
+    Gate4 --> Gate5[Gate 5: Ed25519 Canonical Signature Verification]
+    Gate5 --> Gate6[Gate 6: Subject / Recipient Identity Binding]
+    Gate6 --> Gate7[Gate 7: Revocation Registry Check]
+    Gate7 --> Gate8[Gate 8: Dynamic Expiration Check]
+    Gate8 --> Gate9[Gate 9: External Official Source Query]
+    Gate9 --> Gate10[Gate 10: Evidence Synthesis & Conflict Analysis]
+    Gate10 --> Outcome{Synthesis Decision}
 
-    Gate2 -- Bad Signature --> Fail
-    Gate2 -- Valid Signature --> Gate3{Gate 3: Issuer Key & Trust Anchor Check}
-
-    Gate3 -- Unknown / Untrusted Key --> Fail
-    Gate3 -- Trusted Anchor --> Gate4{Gate 4: Revocation Registry Check}
-
-    Gate4 -- Revoked --> FailRevoked[Return Status: REVOKED with Revocation Proof]
-    Gate4 -- Active --> Gate5{Gate 5: Temporal Validity & Expiry}
-
-    Gate5 -- Expired --> FailExpired[Return Status: EXPIRED]
-    Gate5 -- Active --> Success([Assemble Evidence Package & Return VERIFIED])
+    Outcome -- Pristine Crypto & Registry --> L5[Level 5: CURRENTLY_VALID]
+    Outcome -- Historically Valid but Expired/Revoked --> L4[Level 4: SIGNATURE_VERIFIED]
+    Outcome -- Identity Mismatch / Conflicts --> L3[Level 3: INTEGRITY_VERIFIED]
+    Outcome -- Altered Document / Scan --> L2[Level 2: SOURCE_VERIFIED]
+    Outcome -- Unverified Issuer / Untrusted --> L1[Level 1: SOURCE_FOUND]
+    Outcome -- Not Found --> L0[Level 0: UNKNOWN]
 ```
 
 ---
 
-## 2. Verification Gates in Detail
+## 2. The 16 Discrete Verification Gates
 
-### Gate 1: Schema & Syntax Validation
-* Ensures payload adheres strictly to the credential schema.
-* Verifies mandatory fields: `credentialId`, `issuerId`, `subjectId`, `issuedAt`, `claimData`, `signature`.
+Every verification evaluation assesses and records the pass/fail state and detailed telemetry across all 16 checks:
 
-### Gate 2: Cryptographic Signature Verification
-* Extracts the claim payload and passes it to the RFC 8785 canonicalizer.
-* Computes the SHA-256 digest.
-* Evaluates `crypto.verify(algorithm, digest, publicKey, signature)`.
-* Result must be mathematically valid.
-
-### Gate 3: Issuer Key & Trust Anchor Check
-* Locates the active public key certificate for the specified `issuerId` and `keyId`.
-* Verifies that the signing key was active and unrevoked at `issuedAt`.
-* Assesses the issuer's accreditation status against the Trust Registry.
-
-### Gate 4: Revocation Registry Check
-* Checks the issuer's cryptographically signed Revocation Registry.
-* If `credentialId` appears on the revocation list, the pipeline fails immediately with the recorded revocation reason.
-
-### Gate 5: Temporal Validity & Expiry
-* Assesses whether the credential has an `expiresAt` timestamp and whether `currentTimestamp < expiresAt`.
-* Credentials past expiration are marked `EXPIRED`.
+1. **`credentialExistence`**: Locates credential in platform registry.
+2. **`versionExistence`**: Locates requested version number or latest active version.
+3. **`organizationTrust`**: Assesses whether issuing organization is recognized and verified (`organizationVerificationStatus === 'VERIFIED'`).
+4. **`issuerAuthorization`**: Validates issuer accreditation, active status, and organization binding.
+5. **`issuerKeyStatus`**: Checks if key is `ACTIVE`, `RETIRED` (historical validity preserved), `REVOKED` (invalid), or `COMPROMISED` (checks if issuance timestamp predates or postdates compromise timestamp).
+6. **`documentIntegrity`**: Evaluates uploaded document SHA-256 against registered hash. Distinguishes byte-level alteration from scan/screenshot representation caveats.
+7. **`digitalSignature`**: Reconstructs 9-field RFC 8785 canonical JSON payload and validates Ed25519 signature against issuer's public key.
+8. **`recipientBinding`**: Ensures credential is bound to claimed recipient ID, preventing presentation attacks.
+9. **`credentialStatus`**: Verifies whether credential is active or superseded by a newer version revision.
+10. **`expiration`**: Evaluates temporal validity against `expiresAt`. Expired credentials evaluate to `CREDENTIAL_EXPIRED`, not fake.
+11. **`revocation`**: Evaluates revocation status and extracts timestamp and revocation reason.
+12. **`sourceEvidence`**: Assesses official external registry query confirmation (`SOURCE_VERIFIED` or `SOURCE_FOUND`).
+13. **`ocrEvidence`**: Records extracted text and flags discrepancies against canonical claims.
+14. **`aiEvidence`**: Ingests heuristic anomaly scores and tampering detection flags.
+15. **`humanEvidence`**: Evaluates supervisor or auditor manual review decision (`PENDING`, `VERIFIED`, `REJECTED`).
+16. **`conflicts`**: Cross-references evidence across dimensions (e.g. AI clean vs signature bad; doc hash match vs signature bad; OCR claim vs registry claim).
 
 ---
 
-## 3. Verification Result Output
+## 3. Trust Levels and Outcomes
 
-A successful verification yields an **Evidence Package**:
+| Trust Level | Code | Criteria & Behavior |
+|---|---|---|
+| **Level 0** | **`UNKNOWN`** | Credential identifier does not exist in platform registry (`NOT_FOUND`). |
+| **Level 1** | **`SOURCE_FOUND`** | Document claims an organization or source that is unregistered, unverified, or untrusted (`UNTRUSTED_ORIGIN`). |
+| **Level 2** | **`SOURCE_VERIFIED`** | Issuer is authentic, but document bytes were altered (`ALTERED`), scan/screenshot does not match byte-exact file (`NOT_EXACT_FILE_MATCH`), or digital signature verification failed (`SIGNATURE_INVALID`). |
+| **Level 3** | **`INTEGRITY_VERIFIED`** | Document and source match, but subject identity mismatched (`IDENTITY_MISMATCH`), signing key was compromised (`KEY_COMPROMISED`), conflicting evidence exists (`CONFLICTING_EVIDENCE`), or pending manual review (`MANUAL_REVIEW`). |
+| **Level 4** | **`SIGNATURE_VERIFIED`** | Credential possesses a mathematically valid digital signature and untampered document hash, but has expired (`CREDENTIAL_EXPIRED`), was superseded by a newer version (`CREDENTIAL_SUPERSEDED`), or was revoked (`CREDENTIAL_REVOKED`). |
+| **Level 5** | **`CURRENTLY_VALID`** | Complete verification pass: active accredited issuer, uncompromised key, valid Ed25519 signature, byte-exact document SHA-256 match, unexpired, unrevoked, and confirmed identity (`VERIFIED` or `MANUALLY_VERIFIED`). |
+
+---
+
+## 4. Invariant Rule: Non-Override Principle
+
+> [!CRITICAL]
+> **Cryptographic Inviolability**:
+> Under no circumstances can AI anomaly detection or OCR field extraction override a cryptographic signature failure, document hash mismatch, or credential revocation.
+> If a digital signature fails mathematical verification, the verification result is strictly `SIGNATURE_INVALID` (or `ALTERED`), regardless of whether AI reports 0% anomaly risk or high confidence.
+
+---
+
+## 5. Verification Result Output
+
 ```json
 {
-  "status": "VERIFIED",
-  "verificationId": "ver_9f8c12a4",
-  "verifiedAt": "2026-08-30T10:15:30.000Z",
-  "credentialId": "cred_a1b2c3d4",
-  "issuer": {
-    "id": "iss_7712",
-    "name": "State Medical Licensing Board",
-    "trustTier": "TIER_1"
+  "verificationId": "vrf_fc87553ff8187907",
+  "credentialId": "crd_139af79e38925a36",
+  "result": "VERIFIED",
+  "trustLevel": "LEVEL 5 CURRENTLY_VALID",
+  "cryptographicStatus": "PASSED",
+  "humanVerificationStatus": "PENDING",
+  "checks": {
+    "organizationTrust": { "passed": true, "detail": "Organization verified" },
+    "issuerAuthorization": { "passed": true, "detail": "Issuer active and accredited" },
+    "issuerKeyStatus": { "passed": true, "detail": "Key active" },
+    "documentIntegrity": { "passed": true, "detail": "Exact SHA-256 hash match" },
+    "digitalSignature": { "passed": true, "detail": "Ed25519 signature verified" },
+    "recipientBinding": { "passed": true, "detail": "Recipient bound" },
+    "expiration": { "passed": true, "detail": "Perpetual validity" },
+    "revocation": { "passed": true, "detail": "Clean revocation status" },
+    "conflicts": { "passed": true, "detail": "No conflicting evidence" }
   },
-  "cryptographicProof": {
-    "algorithm": "ed25519",
-    "signatureValid": true,
-    "keyFingerprint": "sha256:d8a2...3f1c"
-  },
-  "revocationStatus": {
-    "checked": true,
-    "isRevoked": false
-  },
-  "overallTrustScore": 1.0
+  "warnings": [],
+  "explanation": "Credential successfully verified against accredited issuer authority.",
+  "evaluatedAt": "2026-08-31T09:43:36.465Z"
 }
 ```

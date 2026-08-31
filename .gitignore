@@ -58,6 +58,7 @@ mongo-data/
 *.safetensors
 *.ckpt
 *.tflite
+*.traineddata
 models/checkpoints/
 
 # System & Editor Files

@@ -55,6 +55,12 @@ class DatabaseError extends AppError {
   }
 }
 
+class TooManyRequestsError extends AppError {
+  constructor(message = 'Too many requests, please try again later', code = 'RATE_LIMIT_EXCEEDED') {
+    super(code, message, 429);
+  }
+}
+
 module.exports = {
   AppError,
   NotFoundError,
@@ -62,5 +68,6 @@ module.exports = {
   UnauthorizedError,
   ForbiddenError,
   ConflictError,
-  DatabaseError
+  DatabaseError,
+  TooManyRequestsError
 };

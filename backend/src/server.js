@@ -42,6 +42,11 @@ async function startServer() {
     console.log(`==================================================`);
   });
 
+  // Security timeouts: mitigate Slowloris and connection starvation attacks
+  server.requestTimeout = 30000;   // 30 seconds
+  server.headersTimeout = 35000;   // 35 seconds (must exceed requestTimeout)
+  server.keepAliveTimeout = 30000; // 30 seconds
+
   let isShuttingDown = false;
 
   // Graceful shutdown handler

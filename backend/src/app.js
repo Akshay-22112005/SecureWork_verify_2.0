@@ -36,6 +36,21 @@ app.use(cors({
 // Structured Request Logging
 app.use(requestLogger);
 
+// Rate Limiting on sensitive routes (auth brute-force and computationally heavy verification)
+const { createRateLimiter } = require('./middleware/rateLimiter');
+const authLimiter = createRateLimiter({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // 100 requests per 15 min per IP
+  message: 'Too many authentication attempts. Please try again later.'
+});
+const evalLimiter = createRateLimiter({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60, // 60 verification evaluations per minute
+  message: 'Verification evaluation rate limit exceeded. Please wait a moment.'
+});
+app.use('/api/auth', authLimiter);
+app.use('/api/verifications/evaluate', evalLimiter);
+
 // Body Parsers with dynamic size limits from configuration
 const bodyLimit = `${env.MAX_FILE_SIZE_MB}mb`;
 app.use(express.json({ limit: bodyLimit }));
