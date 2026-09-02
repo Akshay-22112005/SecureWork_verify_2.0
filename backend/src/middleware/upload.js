@@ -9,17 +9,20 @@ const upload = multer({
   storage,
   limits: {
     fileSize: MAX_FILE_SIZE_BYTES,
-    files: 1
+    files: 2
   }
 });
 
 /**
  * Middleware handling single document upload under field name "file" or "document".
  */
-function handleDocumentUpload(req, res, next) {
-  const singleUpload = upload.single('file');
+const documentUploadFields = upload.fields([
+  { name: 'file', maxCount: 1 },
+  { name: 'document', maxCount: 1 }
+]);
 
-  singleUpload(req, res, (err) => {
+function handleDocumentUpload(req, res, next) {
+  documentUploadFields(req, res, (err) => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') {
         return next(
@@ -32,10 +35,15 @@ function handleDocumentUpload(req, res, next) {
       return next(new ValidationError(err.message, 'UPLOAD_ERROR'));
     }
 
-    if (!req.file) {
+    // Normalize attached file from either 'file' or 'document' field
+    const attachedFile = (req.files?.file && req.files.file[0]) ||
+                         (req.files?.document && req.files.document[0]);
+
+    if (!attachedFile) {
       return next(new ValidationError('No file was attached to the upload request', 'FILE_REQUIRED'));
     }
 
+    req.file = attachedFile;
     next();
   });
 }

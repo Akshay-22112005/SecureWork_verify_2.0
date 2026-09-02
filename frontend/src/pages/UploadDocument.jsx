@@ -33,7 +33,7 @@ export default function UploadDocument({ onNavigate, onDocumentUploaded }) {
 
     try {
       const formData = new FormData();
-      formData.append('document', file);
+      formData.append('file', file);
 
       const res = await api.documents.upload(formData);
       if (res && res.success) {

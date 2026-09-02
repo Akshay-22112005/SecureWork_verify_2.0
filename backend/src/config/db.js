@@ -40,12 +40,18 @@ mongoose.connection.on('reconnected', () => {
   logger.info('MongoDB connection restored');
 });
 
+let retryTimer = null;
+
 /**
  * Connect to MongoDB instance with timeout and retry configuration.
  * @param {string} [uri] - Optional URI override (useful for testing)
  * @returns {Promise<typeof mongoose | null>}
  */
 async function connectDB(uri = env.MONGODB_URI) {
+  if (mongoose.connection.readyState === 1) {
+    return mongoose;
+  }
+
   try {
     dbState.status = 'connecting';
     const conn = await mongoose.connect(uri, {
@@ -59,6 +65,11 @@ async function connectDB(uri = env.MONGODB_URI) {
     dbState.name = conn.connection.name;
     dbState.error = null;
 
+    if (retryTimer) {
+      clearInterval(retryTimer);
+      retryTimer = null;
+    }
+
     logger.info(`MongoDB connected successfully to ${dbState.host}/${dbState.name}`);
     return conn;
   } catch (err) {
@@ -69,6 +80,23 @@ async function connectDB(uri = env.MONGODB_URI) {
     dbState.error = err.message;
 
     logger.error(`MongoDB initial connection failed: ${err.message}`);
+
+    // Automatically retry connecting in the background every 3 seconds
+    if (!retryTimer && process.env.NODE_ENV !== 'test') {
+      retryTimer = setInterval(async () => {
+        if (mongoose.connection.readyState === 0) {
+          try {
+            await mongoose.connect(uri, { serverSelectionTimeoutMS: 3000 });
+            if (retryTimer) {
+              clearInterval(retryTimer);
+              retryTimer = null;
+            }
+          } catch {}
+        }
+      }, 3000);
+      if (retryTimer.unref) retryTimer.unref();
+    }
+
     return null;
   }
 }

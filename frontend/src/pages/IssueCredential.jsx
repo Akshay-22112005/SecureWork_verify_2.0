@@ -17,8 +17,11 @@ export default function IssueCredential({ onNavigate }) {
   const [error, setError] = useState('');
   const [issuedResult, setIssuedResult] = useState(null);
 
+  const [availableUsers, setAvailableUsers] = useState([]);
+  const [availableDocs, setAvailableDocs] = useState([]);
+
   useEffect(() => {
-    async function loadIssuers() {
+    async function loadIssuersAndData() {
       try {
         const res = await api.issuers.list();
         if (res && res.success) {
@@ -29,8 +32,22 @@ export default function IssueCredential({ onNavigate }) {
           else if (list[0]) setSelectedIssuerId(list[0].issuerId);
         }
       } catch {}
+
+      try {
+        const userRes = await api.users.list({ limit: 10 });
+        if (userRes && userRes.success) {
+          setAvailableUsers(userRes.data.users || []);
+        }
+      } catch {}
+
+      try {
+        const docRes = await api.documents.list({ limit: 5 });
+        if (docRes && docRes.success) {
+          setAvailableDocs(docRes.data.documents || []);
+        }
+      } catch {}
     }
-    loadIssuers();
+    loadIssuersAndData();
   }, []);
 
   async function handleIssue(e) {
@@ -118,6 +135,26 @@ export default function IssueCredential({ onNavigate }) {
                 onChange={(e) => setRecipientId(e.target.value)}
                 required
               />
+              {availableUsers.length > 0 && (
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                  <span className="text-muted text-xs" style={{ alignSelf: 'center' }}>Quick select:</span>
+                  {availableUsers
+                    .filter((u) => u.role === 'USER' || u.email.includes('stanford') || u.email.includes('scholar'))
+                    .slice(0, 3)
+                    .map((u) => (
+                      <button
+                        type="button"
+                        key={u.userId}
+                        className="persona-pill text-xs"
+                        style={{ padding: '2px 8px', fontSize: '0.72rem', cursor: 'pointer' }}
+                        onClick={() => setRecipientId(u.userId)}
+                        title={`Select ${u.name} (${u.email})`}
+                      >
+                        {u.name || u.email}
+                      </button>
+                    ))}
+                </div>
+              )}
               <span className="text-muted text-xs">The verified user ID representing the credential recipient.</span>
             </div>
 
@@ -130,6 +167,23 @@ export default function IssueCredential({ onNavigate }) {
                 onChange={(e) => setDocumentId(e.target.value)}
                 required
               />
+              {availableDocs.length > 0 && (
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                  <span className="text-muted text-xs" style={{ alignSelf: 'center' }}>Recent uploads:</span>
+                  {availableDocs.slice(0, 2).map((d) => (
+                    <button
+                      type="button"
+                      key={d.documentId}
+                      className="persona-pill text-xs"
+                      style={{ padding: '2px 8px', fontSize: '0.72rem', cursor: 'pointer' }}
+                      onClick={() => setDocumentId(d.documentId)}
+                      title={`Select ${d.originalFilename || d.documentId}`}
+                    >
+                      {d.originalFilename ? `${d.originalFilename.slice(0, 16)}...` : d.documentId}
+                    </button>
+                  ))}
+                </div>
+              )}
               <span className="text-muted text-xs">Artifact ID from document upload representing the source document.</span>
             </div>
 

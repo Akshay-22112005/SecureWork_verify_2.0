@@ -1,11 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Shield, 
   Bell, 
   LogOut, 
   User as UserIcon, 
   Sparkles,
-  ChevronDown
+  ChevronDown,
+  Mail,
+  Key,
+  Copy,
+  Check,
+  ShieldCheck,
+  Building
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -14,6 +20,15 @@ import StatusBadge from './StatusBadge';
 export default function Navbar({ onNavigate, activePage }) {
   const { user, role, logout, login } = useAuth();
   const { unreadCount, toggleDrawer } = useNotifications();
+  const [showProfileCard, setShowProfileCard] = useState(false);
+  const [copiedField, setCopiedField] = useState(null);
+
+  function handleCopy(text, field) {
+    if (!text) return;
+    navigator.clipboard.writeText(text);
+    setCopiedField(field);
+    setTimeout(() => setCopiedField(null), 2000);
+  }
 
   // Quick Persona switchers for development & automated evaluation
   const demoPersonas = [
@@ -82,19 +97,105 @@ export default function Navbar({ onNavigate, activePage }) {
           {unreadCount > 0 && <span className="bell-badge">{unreadCount > 9 ? '9+' : unreadCount}</span>}
         </button>
 
-        {/* User Info & Role Badge */}
+        {/* User Info & Role Badge with Rich Hover Profile Card */}
         {user ? (
-          <div className="user-profile-badge">
-            <div className="user-avatar">
-              <UserIcon size={16} />
+          <div 
+            className="user-profile-wrapper"
+            onMouseEnter={() => setShowProfileCard(true)}
+            onMouseLeave={() => setShowProfileCard(false)}
+          >
+            <div className="user-profile-badge">
+              <div className="user-avatar">
+                <UserIcon size={16} />
+              </div>
+              <div className="user-info-text">
+                <span className="user-name">{user.name || user.email}</span>
+                <StatusBadge status={user.role} label={user.role} className="user-role-tag" />
+              </div>
+              <button 
+                className="logout-btn" 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  logout();
+                }} 
+                title="Sign Out"
+              >
+                <LogOut size={16} />
+              </button>
             </div>
-            <div className="user-info-text">
-              <span className="user-name">{user.name || user.email}</span>
-              <StatusBadge status={user.role} label={user.role} className="user-role-tag" />
+
+            {/* Hover Profile Popover Card */}
+            <div className={`user-hover-card ${showProfileCard ? 'visible' : ''}`}>
+              <div className="hover-card-header">
+                <div className="hover-card-avatar">
+                  <UserIcon size={22} />
+                </div>
+                <div className="hover-card-title-group">
+                  <div className="hover-card-name">{user.name || 'Verified User'}</div>
+                  <div className="hover-card-role-row">
+                    <StatusBadge status={user.role} label={user.role} />
+                    <span className="hover-status-pill active">
+                      <span className="status-live-pulse"></span> Active
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="hover-card-divider"></div>
+
+              <div className="hover-card-details">
+                <div className="hover-detail-item">
+                  <span className="hover-detail-label">
+                    <Mail size={12} /> Email Address
+                  </span>
+                  <div className="hover-copy-row">
+                    <span className="hover-detail-value">{user.email}</span>
+                    <button 
+                      className="icon-action-btn hover-copy-btn" 
+                      onClick={() => handleCopy(user.email, 'email')}
+                      title="Copy Email"
+                    >
+                      {copiedField === 'email' ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="hover-detail-item">
+                  <span className="hover-detail-label">
+                    <Key size={12} /> Subject User ID
+                  </span>
+                  <div className="hover-copy-row">
+                    <span className="code-snippet text-xs">{user.userId || 'N/A'}</span>
+                    <button 
+                      className="icon-action-btn hover-copy-btn" 
+                      onClick={() => handleCopy(user.userId, 'userId')}
+                      title="Copy User ID"
+                    >
+                      {copiedField === 'userId' ? <Check size={12} className="text-success" /> : <Copy size={12} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="hover-detail-item">
+                  <span className="hover-detail-label">
+                    <ShieldCheck size={12} /> Trust & Session State
+                  </span>
+                  <span className="text-success text-xs" style={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                    <ShieldCheck size={13} /> Authenticated Session (HMAC-SHA256)
+                  </span>
+                </div>
+              </div>
+
+              <div className="hover-card-footer">
+                <button 
+                  className="action-btn secondary text-xs full-width" 
+                  onClick={logout}
+                  style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem' }}
+                >
+                  <LogOut size={13} /> Sign Out
+                </button>
+              </div>
             </div>
-            <button className="logout-btn" onClick={logout} title="Sign Out">
-              <LogOut size={16} />
-            </button>
           </div>
         ) : (
           <div className="auth-btn-row">

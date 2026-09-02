@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Shield } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 
@@ -42,8 +43,23 @@ function MainApp() {
   if (loading) {
     return (
       <div className="loading-screen">
-        <div className="pulse-dot"></div>
-        <p>Initializing Cryptographic Verification Engine...</p>
+        <div className="crypto-loader-container">
+          <div className="crypto-loader-rings">
+            <div className="ring ring-outer"></div>
+            <div className="ring ring-middle"></div>
+            <div className="ring ring-inner"></div>
+            <div className="loader-core-icon">
+              <Shield size={34} />
+            </div>
+          </div>
+          <div className="crypto-loader-text">
+            <h3>SecureWork Verify</h3>
+            <p>Initializing Cryptographic Verification Engine...</p>
+            <div className="crypto-loader-bar">
+              <div className="crypto-loader-progress"></div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }

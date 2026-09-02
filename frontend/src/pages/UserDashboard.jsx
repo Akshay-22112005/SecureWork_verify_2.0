@@ -11,7 +11,9 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
-  GitCommit
+  GitCommit,
+  Copy,
+  Check
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
@@ -19,6 +21,7 @@ import StatusBadge from '../components/StatusBadge';
 
 export default function UserDashboard({ onNavigate }) {
   const { user, role } = useAuth();
+  const [copiedId, setCopiedId] = useState(false);
   const [stats, setStats] = useState({
     credentialsCount: 0,
     verificationsCount: 0,
@@ -27,6 +30,14 @@ export default function UserDashboard({ onNavigate }) {
   });
   const [recentVerifications, setRecentVerifications] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  function handleCopyUserId() {
+    if (user?.userId) {
+      navigator.clipboard.writeText(user.userId);
+      setCopiedId(true);
+      setTimeout(() => setCopiedId(false), 2000);
+    }
+  }
 
   async function loadDashboardData() {
     setLoading(true);
@@ -86,8 +97,21 @@ export default function UserDashboard({ onNavigate }) {
       <div className="page-header">
         <div>
           <h2>Welcome back, {user?.name || user?.email || 'Scholar'}</h2>
-          <p className="page-subtitle">
-            Cryptographic workforce verification dashboard • Active role: <strong className="text-cyan">{role}</strong>
+          <p className="page-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span>Cryptographic workforce verification dashboard • Role: <strong className="text-cyan">{role}</strong></span>
+            {user?.userId && (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginLeft: '0.5rem' }}>
+                • User ID: <code className="code-snippet text-xs">{user.userId}</code>
+                <button
+                  className="icon-action-btn"
+                  onClick={handleCopyUserId}
+                  title="Copy User ID"
+                  style={{ padding: '2px', cursor: 'pointer' }}
+                >
+                  {copiedId ? <Check size={13} className="text-success" /> : <Copy size={13} />}
+                </button>
+              </span>
+            )}
           </p>
         </div>
         <button className="action-btn secondary text-xs" onClick={loadDashboardData} disabled={loading}>
@@ -99,37 +123,61 @@ export default function UserDashboard({ onNavigate }) {
       {/* Metrics Row */}
       <div className="metrics-grid">
         <div className="metric-card glass-card">
-          <div className="metric-icon bg-blue-subtle">
-            <Server size={20} className="text-blue" />
+          <div className="metric-card-top">
+            <span className="metric-label">Backend Engine</span>
+            <div className="metric-icon bg-cyan-subtle">
+              <Server size={18} className="text-cyan" />
+            </div>
           </div>
-          <div className="metric-value">
-            <StatusBadge status={stats.backendStatus} />
+          <div className="metric-card-bottom">
+            <div className="metric-status-row">
+              <span className={`status-indicator-dot ${stats.backendStatus === 'ONLINE' ? 'online' : 'offline'}`}></span>
+              <span className="metric-status-text">{stats.backendStatus === 'ONLINE' ? 'Online' : 'Offline'}</span>
+            </div>
+            <span className="metric-subtext">Ed25519 & SHA-256 Engine</span>
           </div>
-          <div className="metric-label">Backend Cryptographic Engine</div>
         </div>
 
         <div className="metric-card glass-card">
-          <div className="metric-icon bg-cyan-subtle">
-            <Award size={20} className="text-cyan" />
+          <div className="metric-card-top">
+            <span className="metric-label">Active Credentials</span>
+            <div className="metric-icon bg-blue-subtle">
+              <Award size={18} className="text-blue" />
+            </div>
           </div>
-          <div className="metric-value">{stats.credentialsCount}</div>
-          <div className="metric-label">Active Credentials</div>
+          <div className="metric-card-bottom">
+            <div className="metric-number">{stats.credentialsCount}</div>
+            <span className="metric-subtext">Signed Digital Credentials</span>
+          </div>
         </div>
 
         <div className="metric-card glass-card">
-          <div className="metric-icon bg-purple-subtle">
-            <ShieldCheck size={20} className="text-purple" />
+          <div className="metric-card-top">
+            <span className="metric-label">Completed Checks</span>
+            <div className="metric-icon bg-purple-subtle">
+              <ShieldCheck size={18} className="text-purple" />
+            </div>
           </div>
-          <div className="metric-value">{stats.verificationsCount}</div>
-          <div className="metric-label">Completed Verifications</div>
+          <div className="metric-card-bottom">
+            <div className="metric-number">{stats.verificationsCount}</div>
+            <span className="metric-subtext">Evaluated Verification Runs</span>
+          </div>
         </div>
 
         <div className="metric-card glass-card">
-          <div className="metric-icon bg-green-subtle">
-            <GitCommit size={20} className="text-success" />
+          <div className="metric-card-top">
+            <span className="metric-label">Audit Chain</span>
+            <div className="metric-icon bg-green-subtle">
+              <GitCommit size={18} className="text-success" />
+            </div>
           </div>
-          <div className="metric-value">{stats.auditRecordsCount || 'Valid'}</div>
-          <div className="metric-label">Hash-Chained Audit Events</div>
+          <div className="metric-card-bottom">
+            <div className="metric-status-row">
+              <span className="status-indicator-dot online"></span>
+              <span className="metric-status-text">Valid & Intact</span>
+            </div>
+            <span className="metric-subtext">{stats.auditRecordsCount} Tamper-Evident Records</span>
+          </div>
         </div>
       </div>
 
