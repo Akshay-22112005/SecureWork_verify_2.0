@@ -15,12 +15,20 @@ import {
   FileBadge, 
   CheckSquare, 
   ExternalLink,
-  GitCommit
+  GitCommit,
+  X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
-export default function Sidebar({ activePage, onNavigate }) {
+export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMobile }) {
   const { role, isAdmin, isAuditor, isIssuer, isHr, isUser } = useAuth();
+
+  function handleItemClick(itemId) {
+    onNavigate(itemId);
+    if (onCloseMobile) {
+      onCloseMobile();
+    }
+  }
 
   // Navigation schema organized by category
   const navSections = [
@@ -83,32 +91,55 @@ export default function Sidebar({ activePage, onNavigate }) {
   ];
 
   return (
-    <aside className="app-sidebar">
-      <div className="sidebar-scroll-wrapper">
-        {navSections
-          .filter((sec) => sec.visible !== false)
-          .map((sec) => (
-            <div key={sec.title} className="nav-section">
-              <div className="nav-section-title">{sec.title}</div>
-              <div className="nav-item-list">
-                {sec.items.map((item) => {
-                  const ItemIcon = item.icon;
-                  const isActive = activePage === item.id;
-                  return (
-                    <button
-                      key={item.id}
-                      className={`nav-item-btn ${isActive ? 'active' : ''}`}
-                      onClick={() => onNavigate(item.id)}
-                    >
-                      <ItemIcon size={17} className="nav-item-icon" />
-                      <span className="nav-item-label">{item.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
+    <>
+      {mobileOpen && (
+        <div 
+          className="mobile-sidebar-backdrop" 
+          onClick={onCloseMobile}
+          aria-hidden="true"
+        />
+      )}
+      <aside className={`app-sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
+        <div className="sidebar-scroll-wrapper">
+          {mobileOpen && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 0.5rem 0.5rem 0.5rem', borderBottom: '1px solid var(--border-subtle)', marginBottom: '0.5rem' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>NAVIGATION</span>
+              <button 
+                className="icon-action-btn" 
+                onClick={onCloseMobile}
+                style={{ padding: '4px' }}
+                aria-label="Close Navigation"
+              >
+                <X size={18} />
+              </button>
             </div>
-          ))}
-      </div>
-    </aside>
+          )}
+
+          {navSections
+            .filter((sec) => sec.visible !== false)
+            .map((sec) => (
+              <div key={sec.title} className="nav-section">
+                <div className="nav-section-title">{sec.title}</div>
+                <div className="nav-item-list">
+                  {sec.items.map((item) => {
+                    const ItemIcon = item.icon;
+                    const isActive = activePage === item.id;
+                    return (
+                      <button
+                        key={item.id}
+                        className={`nav-item-btn ${isActive ? 'active' : ''}`}
+                        onClick={() => handleItemClick(item.id)}
+                      >
+                        <ItemIcon size={17} className="nav-item-icon" />
+                        <span className="nav-item-label">{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ))}
+        </div>
+      </aside>
+    </>
   );
 }

@@ -18,6 +18,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
+import SimplePricingPreview from '../components/SimplePricingPreview';
 
 export default function UserDashboard({ onNavigate }) {
   const { user, role } = useAuth();
@@ -407,6 +408,9 @@ export default function UserDashboard({ onNavigate }) {
           </table>
         )}
       </div>
+
+      {/* Platform Features, Trusted Partners & Simple Pricing Preview */}
+      <SimplePricingPreview onNavigate={onNavigate} />
     </div>
   );
 }

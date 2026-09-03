@@ -34,10 +34,20 @@ function MainApp() {
   const { user, loading } = useAuth();
   const [activePage, setActivePage] = useState('dashboard');
   const [pageParams, setPageParams] = useState({});
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   function handleNavigate(pageId, params = {}) {
     setActivePage(pageId);
     setPageParams(params);
+    setMobileMenuOpen(false);
+  }
+
+  function handleToggleMobileMenu() {
+    setMobileMenuOpen((prev) => !prev);
+  }
+
+  function handleCloseMobileMenu() {
+    setMobileMenuOpen(false);
   }
 
   if (loading) {
@@ -121,9 +131,19 @@ function MainApp() {
 
   return (
     <div className="app-layout">
-      <Navbar onNavigate={handleNavigate} activePage={activePage} />
+      <Navbar 
+        onNavigate={handleNavigate} 
+        activePage={activePage} 
+        onToggleMobileMenu={handleToggleMobileMenu}
+        mobileMenuOpen={mobileMenuOpen}
+      />
       <div className="app-body">
-        <Sidebar activePage={activePage} onNavigate={handleNavigate} />
+        <Sidebar 
+          activePage={activePage} 
+          onNavigate={handleNavigate} 
+          mobileOpen={mobileMenuOpen}
+          onCloseMobile={handleCloseMobileMenu}
+        />
         <main className="main-content-area">
           {renderPage()}
         </main>

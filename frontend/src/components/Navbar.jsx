@@ -11,13 +11,15 @@ import {
   Copy,
   Check,
   ShieldCheck,
-  Building
+  Building,
+  Menu,
+  X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import StatusBadge from './StatusBadge';
 
-export default function Navbar({ onNavigate, activePage }) {
+export default function Navbar({ onNavigate, activePage, onToggleMobileMenu, mobileMenuOpen }) {
   const { user, role, logout, login } = useAuth();
   const { unreadCount, toggleDrawer } = useNotifications();
   const [showProfileCard, setShowProfileCard] = useState(false);
@@ -30,7 +32,7 @@ export default function Navbar({ onNavigate, activePage }) {
     setTimeout(() => setCopiedField(null), 2000);
   }
 
-  // Quick Persona switchers for development & automated evaluation
+  // Quick Persona switchers for development & evaluation
   const demoPersonas = [
     { label: 'ADMIN', email: 'admin@securework.local', role: 'ADMIN' },
     { label: 'AUDITOR', email: 'auditor@securework.local', role: 'AUDITOR' },
@@ -44,11 +46,9 @@ export default function Navbar({ onNavigate, activePage }) {
       if (persona.role === 'ADMIN') {
         await login('admin@securework.local', 'AdminSecurePass123!');
       } else {
-        // Log in or use default test persona credentials
         await login(persona.email, 'SecureUserPass123!');
       }
     } catch {
-      // If persona password fails, try standard demo pass or register
       try {
         await login(persona.email, 'AdminSecurePass123!');
       } catch (e) {
@@ -59,14 +59,26 @@ export default function Navbar({ onNavigate, activePage }) {
 
   return (
     <nav className="top-nav">
-      <div className="brand-logo" onClick={() => onNavigate('dashboard')} style={{ cursor: 'pointer' }}>
-        <div className="logo-badge">
-          <Shield size={22} />
-        </div>
-        <div>
-          <div className="brand-name">
-            SecureWork Verify
-            <span className="brand-tag">v1.0 Production</span>
+      <div className="nav-left-cluster">
+        {/* Mobile Hamburger Menu Button */}
+        <button 
+          className="mobile-hamburger-btn" 
+          onClick={onToggleMobileMenu}
+          title="Toggle Navigation Menu"
+          aria-label="Toggle Navigation Menu"
+        >
+          {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
+        </button>
+
+        <div className="brand-logo" onClick={() => onNavigate('dashboard')} style={{ cursor: 'pointer' }}>
+          <div className="logo-badge">
+            <Shield size={20} />
+          </div>
+          <div>
+            <div className="brand-name">
+              SecureWork Verify
+              <span className="brand-tag">v1.0 Production</span>
+            </div>
           </div>
         </div>
       </div>
@@ -198,7 +210,7 @@ export default function Navbar({ onNavigate, activePage }) {
             </div>
           </div>
         ) : (
-          <div className="auth-btn-row">
+          <div className="auth-btn-row" style={{ display: 'flex', gap: '0.5rem' }}>
             <button className="action-btn secondary text-xs" onClick={() => onNavigate('login')}>
               Sign In
             </button>
