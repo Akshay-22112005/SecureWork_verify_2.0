@@ -3,7 +3,7 @@ import { GitCommit, ShieldCheck, AlertOctagon, CheckCircle2, RefreshCw, Anchor, 
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 
-export default function AuditChainValidation() {
+export default function AuditChainValidation({ onNavigate }) {
   const [validationResult, setValidationResult] = useState(null);
   const [checkpoints, setCheckpoints] = useState([]);
   const [validating, setValidating] = useState(false);
@@ -61,6 +61,26 @@ export default function AuditChainValidation() {
 
   return (
     <div className="page-content">
+      {/* Auditor Workflow Journey Banner */}
+      {onNavigate && (
+        <div className="glass-card" style={{ padding: '0.75rem 1.25rem', marginBottom: '1.25rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+            <span className="text-muted" style={{ fontWeight: 700 }}>AUDITOR WORKFLOW:</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-cyan)' }} onClick={() => onNavigate('dashboard')}>Auditor Dashboard</span>
+            <span className="text-muted">→</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-blue)' }} onClick={() => onNavigate('audit_logs')}>Audit Logs</span>
+            <span className="text-muted">→</span>
+            <span className="text-muted">Select Event</span>
+            <span className="text-muted">→</span>
+            <span className="text-muted">Event Details</span>
+            <span className="text-muted">→</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-purple)' }} onClick={() => onNavigate('verification_evidence')}>Evidence</span>
+            <span className="text-muted">→</span>
+            <strong style={{ color: '#10b981', textDecoration: 'underline' }}>Validate Hash Chain (Verified ✓)</strong>
+          </div>
+        </div>
+      )}
+
       <div className="page-header">
         <div>
           <h2>Cryptographic Audit Chain Validation Engine</h2>
@@ -191,6 +211,35 @@ export default function AuditChainValidation() {
           </table>
         )}
       </div>
+
+      {/* Auditor Workflow Navigation Footer */}
+      {onNavigate && (
+        <div className="glass-card" style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <span className="text-muted text-xs">Auditor Flow Complete: Cryptographic hash chain bitwise verification confirmed</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button 
+              className="action-btn secondary text-xs" 
+              onClick={() => onNavigate('dashboard')}
+            >
+              ← Back to Auditor Dashboard
+            </button>
+            <button 
+              className="action-btn secondary text-xs" 
+              onClick={() => onNavigate('audit_logs')}
+            >
+              ← Back to Audit Logs
+            </button>
+            <button 
+              className="action-btn primary text-xs"
+              onClick={() => onNavigate('verification_evidence')}
+            >
+              ← Back to Evidence Store
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

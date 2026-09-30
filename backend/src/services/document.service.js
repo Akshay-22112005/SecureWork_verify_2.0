@@ -170,6 +170,32 @@ class DocumentService {
       calculatedHash
     };
   }
+
+  /**
+   * List uploaded documents accessible to the current user.
+   * @param {object} [filters={}]
+   * @param {object} user
+   * @returns {Promise<object[]>}
+   */
+  async listDocuments(filters = {}, user) {
+    if (!user) {
+      throw new ForbiddenError('Authenticated user required', 'UNAUTHORIZED');
+    }
+
+    const query = {};
+    if (!['ADMIN', 'AUDITOR', 'ISSUER'].includes(user.role)) {
+      query.uploadedBy = user.userId;
+    }
+
+    if (filters.representationType) {
+      query.representationType = filters.representationType;
+    }
+
+    const limit = Math.min(Math.max(parseInt(filters.limit, 10) || 20, 1), 100);
+    const documents = await Document.find(query).sort({ createdAt: -1 }).limit(limit);
+
+    return documents.map((doc) => doc.toJSON());
+  }
 }
 
 module.exports = new DocumentService();

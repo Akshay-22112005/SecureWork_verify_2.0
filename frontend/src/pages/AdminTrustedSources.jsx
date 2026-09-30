@@ -3,7 +3,7 @@ import { Link2, ShieldCheck, Plus, RefreshCw, X, AlertTriangle, CheckCircle2 } f
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 
-export default function AdminTrustedSources() {
+export default function AdminTrustedSources({ onNavigate }) {
   const [sources, setSources] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -93,8 +93,54 @@ export default function AdminTrustedSources() {
     }
   }
 
+  async function handleRevoke(sourceId) {
+    const reason = prompt('Enter revocation reason (irreversible):', 'Permanent decommissioning');
+    if (!reason) return;
+    try {
+      const res = await api.trustedSources.revoke(sourceId, reason);
+      if (res && res.success) {
+        setMessage(`Source ${sourceId} revoked.`);
+        loadSources();
+      }
+    } catch (err) {
+      alert(err.message || 'Failed to revoke source');
+    }
+  }
+
+  async function handleVerifyDomain(sourceId) {
+    try {
+      const res = await api.trustedSources.verifyDomain(sourceId);
+      if (res && res.success) {
+        setMessage(`SSRF Domain validation passed for ${sourceId} (${res.data?.domain}).`);
+        loadSources();
+      }
+    } catch (err) {
+      alert(err.message || 'Domain validation failed');
+    }
+  }
+
   return (
     <div className="page-content">
+      {/* Admin Governance Flow Banner */}
+      {onNavigate && (
+        <div className="glass-card" style={{ padding: '0.75rem 1.25rem', marginBottom: '1.25rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(139, 92, 246, 0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+            <span className="text-muted" style={{ fontWeight: 700 }}>ADMIN FLOW:</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-purple)' }} onClick={() => onNavigate('dashboard')}>Admin Dashboard</span>
+            <span className="text-muted">→</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-cyan)' }} onClick={() => onNavigate('admin_users')}>Users</span>
+            <span className="text-muted">→</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-blue)' }} onClick={() => onNavigate('admin_organizations')}>Organizations</span>
+            <span className="text-muted">→</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-purple)' }} onClick={() => onNavigate('admin_issuers')}>Issuers</span>
+            <span className="text-muted">→</span>
+            <strong style={{ color: 'var(--accent-cyan)', textDecoration: 'underline' }}>Trusted Sources (Step 4)</strong>
+            <span className="text-muted">→</span>
+            <span style={{ cursor: 'pointer', color: '#10b981' }} onClick={() => onNavigate('admin_settings')}>System Health</span>
+          </div>
+        </div>
+      )}
+
       <div className="page-header">
         <div>
           <h2>Whitelisted Trusted Sources (SSRF Protection)</h2>

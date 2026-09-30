@@ -157,18 +157,24 @@ export default function UploadDocument({ onNavigate, onDocumentUploaded }) {
                 <span className="text-muted text-xs">{uploadedDoc.localPath}</span>
               </div>
 
-              <div className="artifact-actions-row" style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem' }}>
+              <div className="artifact-actions-row" style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <button 
                   className="action-btn primary text-xs"
+                  onClick={() => onNavigate('document_analysis', { documentId: uploadedDoc.documentId, documentHash: uploadedDoc.sha256Hash })}
+                >
+                  <Cpu size={14} /> Proceed to Document Analysis →
+                </button>
+                <button 
+                  className="action-btn secondary text-xs"
                   onClick={() => onNavigate('verify_document', { documentId: uploadedDoc.documentId, documentHash: uploadedDoc.sha256Hash })}
                 >
                   Verify This Document
                 </button>
                 <button 
                   className="action-btn secondary text-xs"
-                  onClick={() => onNavigate('document_analysis', { documentId: uploadedDoc.documentId })}
+                  onClick={() => onNavigate('my_credentials', { documentId: uploadedDoc.documentId })}
                 >
-                  <Cpu size={14} /> Run OCR & AI Analysis
+                  View My Credentials
                 </button>
               </div>
             </div>

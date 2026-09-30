@@ -11,6 +11,9 @@ router.use(authenticateUser);
 // Upload document with multi-part parsing and magic bytes validation
 router.post('/upload', handleDocumentUpload, documentController.uploadDocument);
 
+// List accessible documents
+router.get('/', documentController.listDocuments);
+
 // Get document metadata
 router.get('/:id', documentController.getDocument);
 

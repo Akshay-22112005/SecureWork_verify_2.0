@@ -32,7 +32,12 @@ async function evaluateVerification(req, res, next) {
 async function verifySource(req, res, next) {
   try {
     const { sourceCode, queryParams } = req.body;
-    const result = await trustedSourceService.querySourceVerification(sourceCode, queryParams, req.user);
+    const params = queryParams || {
+      identifier: req.body.identifier || req.body.credentialIdentifier || req.body.studentId || req.body.licenseNumber,
+      credentialIdentifier: req.body.credentialIdentifier || req.body.identifier,
+      documentHash: req.body.documentHash
+    };
+    const result = await trustedSourceService.querySourceVerification(sourceCode, params, req.user);
     return successResponse(res, result, 200);
   } catch (err) {
     next(err);

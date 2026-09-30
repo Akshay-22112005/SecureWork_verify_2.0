@@ -3,20 +3,52 @@ import { Award, ShieldCheck, Eye, RefreshCw, X, Calendar, Key, FileText } from '
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 
-export default function MyCredentials({ onNavigate }) {
+export default function MyCredentials({ initialParams = {}, onNavigate }) {
   const [credentials, setCredentials] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [selectedCred, setSelectedCred] = useState(null);
+  const [loadingModal, setLoadingModal] = useState(false);
+
+  async function openCredentialDetail(cred) {
+    setSelectedCred(cred);
+    setLoadingModal(true);
+    try {
+      const res = await api.credentials.getById(cred.credentialId);
+      if (res && res.success) {
+        setSelectedCred({
+          ...res.data.credential,
+          currentVersion: res.data.currentVersion
+        });
+      }
+    } catch (err) {
+      console.warn('Failed to load full credential details', err);
+    } finally {
+      setLoadingModal(false);
+    }
+  }
 
   async function loadCredentials() {
     setLoading(true);
+    setError('');
     try {
       const res = await api.credentials.list({ limit: 50 });
       if (res && res.success) {
-        setCredentials(res.data.credentials || []);
+        const list = res.data.credentials || [];
+        setCredentials(list);
+        if (initialParams.credentialId) {
+          const matched = list.find((c) => c.credentialId === initialParams.credentialId);
+          if (matched) {
+            openCredentialDetail(matched);
+          } else {
+            openCredentialDetail({ credentialId: initialParams.credentialId });
+          }
+        }
+      } else {
+        setError(res?.error?.message || 'Failed to load credentials');
       }
     } catch (err) {
-      console.warn('Failed to load credentials', err);
+      setError(err.message || 'Failed to communicate with credentials service');
     } finally {
       setLoading(false);
     }
@@ -24,7 +56,7 @@ export default function MyCredentials({ onNavigate }) {
 
   useEffect(() => {
     loadCredentials();
-  }, []);
+  }, [initialParams.credentialId]);
 
   return (
     <div className="page-content">
@@ -41,9 +73,19 @@ export default function MyCredentials({ onNavigate }) {
         </button>
       </div>
 
+      {error && (
+        <div className="alert-banner danger" style={{ marginBottom: '1rem' }}>
+          <span>{error}</span>
+          <button className="link-btn" onClick={loadCredentials} style={{ marginLeft: '1rem' }}>Retry</button>
+        </div>
+      )}
+
       <div className="glass-card table-container">
         {loading ? (
-          <div className="empty-state">Loading credentials...</div>
+          <div className="empty-state">
+            <RefreshCw size={28} className="pulse-dot" style={{ marginBottom: '0.75rem' }} />
+            <p>Loading credentials from cryptographic registry...</p>
+          </div>
         ) : credentials.length === 0 ? (
           <div className="empty-state">
             <Award size={36} style={{ opacity: 0.3, marginBottom: '0.75rem' }} />
@@ -66,8 +108,13 @@ export default function MyCredentials({ onNavigate }) {
             </thead>
             <tbody>
               {credentials.map((c) => (
-                <tr key={c.credentialId}>
-                  <td className="code-snippet">{c.credentialId}</td>
+                <tr 
+                  key={c.credentialId}
+                  onClick={() => openCredentialDetail(c)}
+                  style={{ cursor: 'pointer' }}
+                  title="Click to view full credential details"
+                >
+                  <td className="code-snippet" style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>{c.credentialId}</td>
                   <td><span className="badge-tag">{c.credentialType}</span></td>
                   <td><strong>{c.title}</strong></td>
                   <td className="code-snippet text-muted">{c.issuerId}</td>
@@ -78,14 +125,24 @@ export default function MyCredentials({ onNavigate }) {
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button 
                         className="icon-action-btn"
-                        onClick={() => setSelectedCred(c)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openCredentialDetail(c);
+                        }}
                         title="View Credential Detail & Canonical Payload"
                       >
                         <Eye size={15} />
                       </button>
                       <button 
                         className="action-btn primary text-xs"
-                        onClick={() => onNavigate('verify_document', { credentialId: c.credentialId })}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNavigate('verify_document', { 
+                            credentialId: c.credentialId,
+                            documentHash: c.documentHash,
+                            documentId: c.documentId
+                          });
+                        }}
                         title="Run Full Verification"
                         style={{ padding: '0.2rem 0.6rem' }}
                       >
@@ -107,13 +164,18 @@ export default function MyCredentials({ onNavigate }) {
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <Award size={20} className="text-cyan" />
-                <h3>{selectedCred.title}</h3>
+                <h3>{selectedCred.title || 'Credential Details'}</h3>
               </div>
               <button className="close-btn" onClick={() => setSelectedCred(null)}>
                 <X size={18} />
               </button>
             </div>
             <div className="modal-body">
+              {loadingModal && (
+                <div style={{ padding: '0.5rem 0', color: 'var(--accent-cyan)', fontSize: '0.85rem' }}>
+                  Loading canonical cryptographic payload...
+                </div>
+              )}
               <div className="credential-detail-grid">
                 <div className="detail-row">
                   <span className="detail-label">Credential ID</span>
@@ -122,6 +184,14 @@ export default function MyCredentials({ onNavigate }) {
                 <div className="detail-row">
                   <span className="detail-label">Current Version ID</span>
                   <span className="code-snippet">{selectedCred.currentVersionId}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Document ID</span>
+                  <span className="code-snippet">{selectedCred.documentId || selectedCred.currentVersion?.documentId || 'N/A'}</span>
+                </div>
+                <div className="detail-row">
+                  <span className="detail-label">Document SHA-256 Hash</span>
+                  <span className="code-snippet hash-text">{selectedCred.documentHash || selectedCred.currentVersion?.documentHash || 'N/A'}</span>
                 </div>
                 <div className="detail-row">
                   <span className="detail-label">Lifecycle Status</span>
@@ -135,10 +205,12 @@ export default function MyCredentials({ onNavigate }) {
                   <span className="detail-label">Recipient Subject</span>
                   <span className="code-snippet">{selectedCred.recipientId}</span>
                 </div>
-                <div className="detail-row">
-                  <span className="detail-label">Document Hash</span>
-                  <span className="code-snippet hash-text">{selectedCred.documentHash}</span>
-                </div>
+                {selectedCred.currentVersion?.issuerKeyId && (
+                  <div className="detail-row">
+                    <span className="detail-label">Signing Key ID</span>
+                    <span className="code-snippet">{selectedCred.currentVersion.issuerKeyId}</span>
+                  </div>
+                )}
                 {selectedCred.revokedAt && (
                   <div className="detail-row">
                     <span className="detail-label">Revocation Reason</span>
@@ -147,9 +219,18 @@ export default function MyCredentials({ onNavigate }) {
                 )}
               </div>
 
+              {selectedCred.currentVersion?.signature && (
+                <div style={{ marginTop: '1.25rem' }}>
+                  <h4>Digital Signature (Ed25519)</h4>
+                  <div className="raw-text-box" style={{ wordBreak: 'break-all', fontSize: '0.75rem' }}>
+                    {selectedCred.currentVersion.signature}
+                  </div>
+                </div>
+              )}
+
               {selectedCred.currentVersion && (
-                <div style={{ marginTop: '1.5rem' }}>
-                  <h4>Cryptographic Version Artifact</h4>
+                <div style={{ marginTop: '1.25rem' }}>
+                  <h4>RFC 8785 Canonical Payload</h4>
                   <div className="json-code-box">
                     <pre>{JSON.stringify(selectedCred.currentVersion.signedPayload || selectedCred.currentVersion, null, 2)}</pre>
                   </div>
@@ -160,8 +241,15 @@ export default function MyCredentials({ onNavigate }) {
                 <button 
                   className="action-btn primary"
                   onClick={() => {
+                    const docId = selectedCred.documentId || selectedCred.currentVersion?.documentId;
+                    const docHash = selectedCred.documentHash || selectedCred.currentVersion?.documentHash;
+                    const cId = selectedCred.credentialId;
                     setSelectedCred(null);
-                    onNavigate('verify_document', { credentialId: selectedCred.credentialId });
+                    onNavigate('verify_document', { 
+                      credentialId: cId,
+                      documentHash: docHash,
+                      documentId: docId
+                    });
                   }}
                 >
                   <ShieldCheck size={16} /> Run Cryptographic Verification

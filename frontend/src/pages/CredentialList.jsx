@@ -3,7 +3,7 @@ import { Award, Eye, Trash2, RefreshCw, X, AlertTriangle, ShieldCheck, CheckCirc
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 
-export default function CredentialList({ onNavigate }) {
+export default function CredentialList({ initialParams = {}, onNavigate }) {
   const [credentials, setCredentials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCred, setSelectedCred] = useState(null);
@@ -14,20 +14,6 @@ export default function CredentialList({ onNavigate }) {
   const [revocationReason, setRevocationReason] = useState('');
   const [revoking, setRevoking] = useState(false);
   const [actionSuccess, setActionSuccess] = useState('');
-
-  async function loadCredentials() {
-    setLoading(true);
-    try {
-      const res = await api.credentials.list({ limit: 100 });
-      if (res && res.success) {
-        setCredentials(res.data.credentials || []);
-      }
-    } catch (err) {
-      console.warn('Failed to load credentials', err);
-    } finally {
-      setLoading(false);
-    }
-  }
 
   async function openCredentialDetail(cred) {
     setSelectedCred(cred);
@@ -40,7 +26,16 @@ export default function CredentialList({ onNavigate }) {
         api.credentials.getTimeline(cred.credentialId)
       ]);
       if (versionsRes.status === 'fulfilled' && versionsRes.value?.success) {
-        setCredVersions(versionsRes.value.data.versions || []);
+        const vList = versionsRes.value.data.versions || [];
+        setCredVersions(vList);
+        const curV = vList.find((v) => v.versionId === cred.currentVersionId) || vList[0];
+        if (curV) {
+          setSelectedCred((prev) => ({
+            ...prev,
+            documentHash: curV.documentHash || prev?.documentHash,
+            documentId: curV.documentId || prev?.documentId
+          }));
+        }
       }
       if (timelineRes.status === 'fulfilled' && timelineRes.value?.success) {
         setCredTimeline(timelineRes.value.data.timeline || []);
@@ -52,9 +47,37 @@ export default function CredentialList({ onNavigate }) {
     }
   }
 
+  async function loadCredentials() {
+    setLoading(true);
+    try {
+      const res = await api.credentials.list({ limit: 100 });
+      if (res && res.success) {
+        const list = res.data.credentials || [];
+        setCredentials(list);
+        if (initialParams.credentialId) {
+          const matched = list.find((c) => c.credentialId === initialParams.credentialId);
+          if (matched) {
+            openCredentialDetail(matched);
+          } else {
+            try {
+              const single = await api.credentials.getById(initialParams.credentialId);
+              if (single && single.success) {
+                openCredentialDetail(single.data.credential);
+              }
+            } catch {}
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Failed to load credentials', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
     loadCredentials();
-  }, []);
+  }, [initialParams.credentialId]);
 
   async function handleRevokeSubmit(e) {
     e.preventDefault();
@@ -124,8 +147,13 @@ export default function CredentialList({ onNavigate }) {
             </thead>
             <tbody>
               {credentials.map((c) => (
-                <tr key={c.credentialId}>
-                  <td className="code-snippet">{c.credentialId}</td>
+                <tr 
+                  key={c.credentialId}
+                  onClick={() => openCredentialDetail(c)}
+                  style={{ cursor: 'pointer' }}
+                  title="Click to view full credential details & version history"
+                >
+                  <td className="code-snippet" style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>{c.credentialId}</td>
                   <td><span className="badge-tag">{c.credentialType}</span></td>
                   <td><strong>{c.title}</strong></td>
                   <td className="code-snippet text-muted">{c.recipientId}</td>
@@ -135,15 +163,36 @@ export default function CredentialList({ onNavigate }) {
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button 
                         className="icon-action-btn"
-                        onClick={() => openCredentialDetail(c)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openCredentialDetail(c);
+                        }}
                         title="View Details & Version History"
                       >
                         <Eye size={15} />
                       </button>
+                      <button 
+                        className="action-btn primary text-xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onNavigate('verify_document', { 
+                            credentialId: c.credentialId,
+                            documentHash: c.documentHash,
+                            documentId: c.documentId 
+                          });
+                        }}
+                        title="Verify Credential in Engine"
+                        style={{ padding: '0.2rem 0.6rem' }}
+                      >
+                        Verify
+                      </button>
                       {c.status === 'ACTIVE' && (
                         <button 
                           className="icon-action-btn text-danger"
-                          onClick={() => setRevokeTarget(c)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setRevokeTarget(c);
+                          }}
                           title="Revoke Credential"
                         >
                           <Trash2 size={15} />
@@ -267,8 +316,10 @@ export default function CredentialList({ onNavigate }) {
                   className="action-btn primary text-xs"
                   onClick={() => {
                     const cid = selectedCred.credentialId;
+                    const dHash = selectedCred.documentHash;
+                    const dId = selectedCred.documentId;
                     setSelectedCred(null);
-                    onNavigate('verify_document', { credentialId: cid });
+                    onNavigate('verify_document', { credentialId: cid, documentHash: dHash, documentId: dId });
                   }}
                 >
                   <ShieldCheck size={14} /> Verify Credential

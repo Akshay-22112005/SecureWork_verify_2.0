@@ -123,6 +123,55 @@ async function seedAdmin(options = {}) {
       }
     }
 
+    // 4. Ensure Scholar has an authentic issued credential from Stanford University
+    const scholarUser = await User.findOne({ email: 'scholar@stanford.edu' });
+    const Document = require('../models/document.model');
+    const Credential = require('../models/credential.model');
+    const credentialService = require('../services/credential.service');
+    const fs = require('fs');
+
+    if (scholarUser && issuerUser) {
+      const issuerProf = await Issuer.findOne({ userId: issuerUser.userId });
+      if (issuerProf) {
+        let scholarCred = await Credential.findOne({ recipientId: scholarUser.userId });
+        if (!scholarCred) {
+          const sampleContent = Buffer.from(
+            `STANFORD UNIVERSITY OFFICIAL DEGREE CONFERRAL\n\nThis is to certify that Dr. Katherine Bell has completed the Doctor of Philosophy in Computer Science.\nIssued: 2026-06-15\nRegistrar Seal: Cryptographically Authenticated`
+          );
+          const sampleHash = crypto.createHash('sha256').update(sampleContent).digest('hex');
+          const storageDir = env.STORAGE_PATH;
+          if (!fs.existsSync(storageDir)) {
+            fs.mkdirSync(storageDir, { recursive: true });
+          }
+          const docFilePath = path.join(storageDir, `stanford_phd_bell.pdf`);
+          fs.writeFileSync(docFilePath, sampleContent);
+
+          const sampleDoc = await Document.create({
+            originalFilename: 'stanford_phd_katherine_bell.pdf',
+            mimeType: 'application/pdf',
+            fileSize: sampleContent.length,
+            storagePath: docFilePath,
+            sha256Hash: sampleHash,
+            uploadedBy: scholarUser.userId,
+            representationType: 'PDF'
+          });
+
+          await credentialService.issueCredential(
+            {
+              issuerId: issuerProf.issuerId,
+              recipientId: scholarUser.userId,
+              documentId: sampleDoc.documentId,
+              credentialType: 'DEGREE',
+              title: 'Doctor of Philosophy in Computer Science',
+              expiresAt: null
+            },
+            issuerUser
+          );
+          console.log(`[Seed] Issued authentic cryptographic degree credential for Dr. Katherine Bell`);
+        }
+      }
+    }
+
     console.log(`==================================================`);
     console.log(`  All Test Personas & Admin Successfully Seeded!`);
     console.log(`  Admin:    admin@securework.local (AdminSecurePass123!)`);

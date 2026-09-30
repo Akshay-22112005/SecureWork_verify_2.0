@@ -3,7 +3,7 @@ import { Users, Shield, RefreshCw, AlertCircle, CheckCircle2, UserCheck } from '
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 
-export default function AdminUsers() {
+export default function AdminUsers({ onNavigate }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingId, setUpdatingId] = useState(null);
@@ -47,6 +47,26 @@ export default function AdminUsers() {
 
   return (
     <div className="page-content">
+      {/* Admin Governance Flow Banner */}
+      {onNavigate && (
+        <div className="glass-card" style={{ padding: '0.75rem 1.25rem', marginBottom: '1.25rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(139, 92, 246, 0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+            <span className="text-muted" style={{ fontWeight: 700 }}>ADMIN FLOW:</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-purple)' }} onClick={() => onNavigate('dashboard')}>Admin Dashboard</span>
+            <span className="text-muted">→</span>
+            <strong style={{ color: 'var(--accent-cyan)', textDecoration: 'underline' }}>Users & RBAC (Step 1)</strong>
+            <span className="text-muted">→</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-blue)' }} onClick={() => onNavigate('admin_organizations')}>Organizations</span>
+            <span className="text-muted">→</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-purple)' }} onClick={() => onNavigate('admin_issuers')}>Issuers</span>
+            <span className="text-muted">→</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-cyan)' }} onClick={() => onNavigate('admin_trusted_sources')}>Trusted Sources</span>
+            <span className="text-muted">→</span>
+            <span style={{ cursor: 'pointer', color: '#10b981' }} onClick={() => onNavigate('admin_settings')}>System Health</span>
+          </div>
+        </div>
+      )}
+
       <div className="page-header">
         <div>
           <h2>User Directory & RBAC Governance</h2>
@@ -121,6 +141,29 @@ export default function AdminUsers() {
           </table>
         )}
       </div>
+
+      {/* Admin Governance Navigation Footer */}
+      {onNavigate && (
+        <div className="glass-card" style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <span className="text-muted text-xs">Admin Governance Workflow: Step 1 of 5 (User Directory & RBAC Governance)</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button 
+              className="action-btn secondary text-xs" 
+              onClick={() => onNavigate('dashboard')}
+            >
+              ← Back to Admin Dashboard
+            </button>
+            <button 
+              className="action-btn primary text-xs"
+              onClick={() => onNavigate('admin_organizations')}
+            >
+              Next: Organizations & Trust Governance →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

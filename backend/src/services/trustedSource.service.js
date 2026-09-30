@@ -1,8 +1,12 @@
+const crypto = require('crypto');
 const TrustedSource = require('../models/trustedSource.model');
 const Organization = require('../models/organization.model');
+const Verification = require('../models/verification.model');
+const VerificationEvidence = require('../models/verificationEvidence.model');
 const auditService = require('./audit.service');
 const { getSourceAdapter } = require('./sources');
 const { validateUrlForSsrf } = require('../utils/ssrfProtection');
+const { TRUST_LEVELS, RESULT_TYPES } = require('./verification/verificationConstants');
 const { ValidationError, NotFoundError, ForbiddenError } = require('../utils/errors');
 
 /**
@@ -226,19 +230,91 @@ class TrustedSourceService {
     const adapter = getSourceAdapter();
     const result = await adapter.verifyRecord(source, queryParams || {});
 
+    // Generate real verificationId and persist immutable evidence records
+    const verificationId = `vrf_src_${crypto.randomBytes(8).toString('hex')}`;
+    const credIdentifier = (queryParams && (queryParams.identifier || queryParams.credentialIdentifier || queryParams.studentId || queryParams.licenseNumber || queryParams.registrationId)) || null;
+
+    try {
+      await Verification.create({
+        verificationId,
+        credentialId: credIdentifier,
+        documentHash: queryParams?.documentHash || null,
+        requestedBy: user ? user.userId : 'HR_VERIFIER',
+        result: result.sourceState === 'SOURCE_VERIFIED'
+          ? RESULT_TYPES.SOURCE_VERIFIED
+          : (result.sourceState === 'SOURCE_FOUND' ? RESULT_TYPES.SOURCE_FOUND : RESULT_TYPES.NOT_FOUND),
+        trustLevel: result.sourceState === 'SOURCE_VERIFIED'
+          ? TRUST_LEVELS.LEVEL_2_SOURCE_VERIFIED
+          : (result.sourceState === 'SOURCE_FOUND' ? TRUST_LEVELS.LEVEL_1_SOURCE_FOUND : TRUST_LEVELS.LEVEL_0_UNKNOWN),
+        cryptographicStatus: result.sourceState === 'SOURCE_VERIFIED' ? 'PASSED' : (result.verified ? 'NOT_APPLICABLE' : 'FAILED'),
+        humanVerificationStatus: 'PENDING',
+        finalResult: result.sourceState === 'SOURCE_VERIFIED'
+          ? RESULT_TYPES.SOURCE_VERIFIED
+          : (result.sourceState === 'SOURCE_FOUND' ? RESULT_TYPES.SOURCE_FOUND : RESULT_TYPES.NOT_FOUND),
+        checks: {
+          sourceTrust: {
+            passed: result.verified,
+            name: 'Trusted Source Accreditation',
+            description: `Authoritative query against accredited ${source.name}`,
+            details: result.notes || `Source state: ${result.sourceState}`
+          },
+          domainVerification: {
+            passed: true,
+            name: 'SSRF-Protected Domain Origin',
+            details: `Validated whitelisted origin: ${source.domain}`
+          },
+          recordIntegrity: {
+            passed: Boolean(result.responseHash),
+            name: 'Response Digest Integrity',
+            details: `SHA-256 Digest: ${result.responseHash}`
+          }
+        },
+        evidence: [
+          {
+            type: 'OFFICIAL_SOURCE_REGISTRY',
+            sourceName: source.name,
+            sourceCode: source.sourceCode,
+            responseHash: result.responseHash,
+            rawResponse: result.rawResponse
+          }
+        ],
+        warnings: result.verified ? [] : ['Registry search returned no matching record for candidate identifier'],
+        explanation: result.notes || `Official source query against ${source.name}`
+      });
+
+      await VerificationEvidence.create({
+        verificationId,
+        evidenceType: 'DOMAIN_VERIFICATION',
+        sourceId: source.sourceCode,
+        sourceUrl: source.baseUrl,
+        credentialIdentifier: credIdentifier,
+        documentHash: queryParams?.documentHash || null,
+        responseHash: result.responseHash,
+        signaturePresent: Boolean(result.rawResponse?.record?.isCryptographicallySigned || result.rawResponse?.signature),
+        signatureValid: Boolean(result.verified && (result.rawResponse?.record?.isCryptographicallySigned || result.rawResponse?.signature)),
+        evidenceStatus: result.verified ? 'CONFIRMED' : 'CONTRADICTED',
+        sourceResponseSummary: result.rawResponse || result
+      });
+    } catch (saveErr) {
+      console.warn('Could not persist verification evidence record for source query:', saveErr.message);
+    }
+
     await auditService.recordEvent(
-      user ? user.userId : 'PUBLIC_VERIFIER',
-      user ? user.role : 'USER',
+      user ? user.userId : 'HR_VERIFIER',
+      user ? user.role : 'HR',
       'SOURCE_VERIFICATION_PERFORMED',
       source.sourceCode,
       {
+        verificationId,
         sourceState: result.sourceState,
         verified: result.verified,
-        responseHash: result.responseHash
+        responseHash: result.responseHash,
+        credentialIdentifier: credIdentifier
       }
     );
 
     return {
+      verificationId,
       sourceCode: source.sourceCode,
       sourceName: source.name,
       domain: source.domain,

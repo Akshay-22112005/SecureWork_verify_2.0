@@ -19,7 +19,7 @@ async function createTrustedSource(req, res, next) {
 async function listTrustedSources(req, res, next) {
   try {
     const sources = await trustedSourceService.listTrustedSources(req.query);
-    return successResponse(res, { trustedSources: sources }, 200);
+    return successResponse(res, { trustedSources: sources, sources }, 200);
   } catch (err) {
     next(err);
   }

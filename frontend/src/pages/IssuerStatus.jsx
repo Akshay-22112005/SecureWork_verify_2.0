@@ -12,7 +12,7 @@ export default function IssuerStatus({ onNavigate }) {
   async function loadIssuerProfile() {
     setLoading(true);
     try {
-      const res = await api.issuers.list();
+      const res = await api.issuers.list({ limit: 100 });
       if (res && res.success && res.data.issuers?.length > 0) {
         // Match current user issuer or first
         const matched = res.data.issuers.find((i) => i.userId === user?.userId) || res.data.issuers[0];
@@ -77,19 +77,19 @@ export default function IssuerStatus({ onNavigate }) {
               <span className="text-muted text-xs">{issuer.approvedAt ? new Date(issuer.approvedAt).toLocaleString() : 'N/A'}</span>
             </div>
 
-            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem' }}>
+            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
               <button 
-                className="action-btn primary text-xs" 
+                className="action-btn primary text-xs"
+                onClick={() => onNavigate('key_status')}
+              >
+                <Key size={14} /> Inspect Key Status →
+              </button>
+              <button 
+                className="action-btn secondary text-xs" 
                 onClick={() => onNavigate('issue_credential')}
                 disabled={issuer.status !== 'ACTIVE'}
               >
                 Issue New Credential
-              </button>
-              <button 
-                className="action-btn secondary text-xs"
-                onClick={() => onNavigate('key_status')}
-              >
-                <Key size={14} /> Manage Cryptographic Keys
               </button>
             </div>
           </div>
@@ -112,6 +112,29 @@ export default function IssuerStatus({ onNavigate }) {
           <p className="text-secondary text-sm" style={{ marginBottom: '1.5rem' }}>
             To issue credentials, you must have an active accredited issuer profile linked to a verified organization.
           </p>
+        </div>
+      )}
+
+      {/* Workflow Navigation Footer */}
+      {onNavigate && (
+        <div className="glass-card" style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <span className="text-muted text-xs">Issuer Workflow: Issuer Dashboard → Issuer Status → Key Status</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button 
+              className="action-btn secondary text-xs" 
+              onClick={() => onNavigate('dashboard')}
+            >
+              ← Back to Issuer Dashboard
+            </button>
+            <button 
+              className="action-btn primary text-xs" 
+              onClick={() => onNavigate('key_status')}
+            >
+              Proceed to Key Status →
+            </button>
+          </div>
         </div>
       )}
     </div>

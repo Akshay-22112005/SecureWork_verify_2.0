@@ -4,7 +4,17 @@
  * automatic 401 session expiration handling, and JSON/multipart handling.
  */
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+// Normalize base API URL from environment
+function resolveApiBaseUrl() {
+  const envBase = (import.meta.env.VITE_API_BASE_URL || '/api').trim().replace(/\/+$/, '');
+  // If base is only a host e.g. "http://localhost:5000", append "/api"
+  if (/^https?:\/\/[^/]+$/.test(envBase)) {
+    return `${envBase}/api`;
+  }
+  return envBase;
+}
+
+export const API_BASE = resolveApiBaseUrl();
 
 export class ApiError extends Error {
   constructor(message, status, code, details = null) {
@@ -23,12 +33,16 @@ export function setSessionExpiredHandler(handler) {
 }
 
 export async function apiClient(endpoint, options = {}) {
-  const url = endpoint.startsWith('http') ? endpoint : `${API_BASE}${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+  const base = resolveApiBaseUrl();
+  const url = endpoint.startsWith('http')
+    ? endpoint
+    : `${base}/${endpoint.replace(/^\/+/, '')}`;
   
   const token = localStorage.getItem('securework_token');
   const headers = { ...options.headers };
 
-  if (token && !headers['Authorization']) {
+  // Automatically attach JWT authorization header where available unless explicitly skipped
+  if (!options.skipAuth && token && token !== 'null' && token !== 'undefined' && !headers['Authorization']) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
@@ -45,8 +59,8 @@ export async function apiClient(endpoint, options = {}) {
     body
   });
 
-  // Check 401 Unauthorized / Token Expiry
-  if (response.status === 401) {
+  // Check 401 Unauthorized / Token Expiry (excluding login/register attempts)
+  if (response.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/register')) {
     localStorage.removeItem('securework_token');
     localStorage.removeItem('securework_user');
     if (typeof onSessionExpiredHandler === 'function') {
@@ -63,8 +77,8 @@ export async function apiClient(endpoint, options = {}) {
   }
 
   if (!response.ok) {
-    const errorInfo = data?.error || {};
-    const message = errorInfo.message || data?.message || `HTTP ${response.status}: Request failed`;
+    const errorInfo = (typeof data === 'object' && data !== null) ? (data.error || {}) : {};
+    const message = (typeof errorInfo === 'string' ? errorInfo : errorInfo.message) || data?.message || `HTTP ${response.status}: Request failed`;
     const code = errorInfo.code || data?.code || 'API_ERROR';
     throw new ApiError(message, response.status, code, errorInfo);
   }

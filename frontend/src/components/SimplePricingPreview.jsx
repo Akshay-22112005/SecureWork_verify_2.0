@@ -18,8 +18,10 @@ import {
   Building,
   CheckCircle2
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 export default function SimplePricingPreview({ onNavigate }) {
+  const { role, isIssuer, isAdmin } = useAuth();
   const [showContactModal, setShowContactModal] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [formData, setFormData] = useState({
@@ -234,7 +236,13 @@ export default function SimplePricingPreview({ onNavigate }) {
 
             <button
               className="action-btn highlighted-cta-btn full-width"
-              onClick={() => onNavigate && onNavigate('issue_credential')}
+              onClick={() => {
+                if (isIssuer || isAdmin) {
+                  onNavigate && onNavigate('issue_credential');
+                } else {
+                  setShowContactModal(true);
+                }
+              }}
             >
               Get Started
             </button>

@@ -3,12 +3,12 @@ import { Award, ShieldCheck, AlertCircle, CheckCircle2, ArrowRight, Key } from '
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
-export default function IssueCredential({ onNavigate }) {
+export default function IssueCredential({ initialParams = {}, onNavigate }) {
   const { user } = useAuth();
   const [issuers, setIssuers] = useState([]);
   const [selectedIssuerId, setSelectedIssuerId] = useState('');
-  const [recipientId, setRecipientId] = useState('');
-  const [documentId, setDocumentId] = useState('');
+  const [recipientId, setRecipientId] = useState(initialParams.recipientId || '');
+  const [documentId, setDocumentId] = useState(initialParams.documentId || '');
   const [credentialType, setCredentialType] = useState('DEGREE');
   const [title, setTitle] = useState('');
   const [validityDays, setValidityDays] = useState(730);
@@ -23,11 +23,12 @@ export default function IssueCredential({ onNavigate }) {
   useEffect(() => {
     async function loadIssuersAndData() {
       try {
-        const res = await api.issuers.list();
+        const res = await api.issuers.list({ limit: 100 });
         if (res && res.success) {
           const list = res.data.issuers || [];
           setIssuers(list);
-          const active = list.find((i) => i.status === 'ACTIVE');
+          const userIssuer = list.find((i) => i.userId === user?.userId && i.status === 'ACTIVE');
+          const active = userIssuer || list.find((i) => i.status === 'ACTIVE');
           if (active) setSelectedIssuerId(active.issuerId);
           else if (list[0]) setSelectedIssuerId(list[0].issuerId);
         }
@@ -269,12 +270,31 @@ export default function IssueCredential({ onNavigate }) {
                 </div>
               </div>
 
-              <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem' }}>
+              <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
                 <button
                   className="action-btn primary text-xs"
-                  onClick={() => onNavigate('verify_document', { credentialId: issuedResult.credential.credentialId })}
+                  onClick={() => onNavigate('credential_list', { credentialId: issuedResult.credential.credentialId })}
+                >
+                  <Award size={14} /> View in Credential Registry →
+                </button>
+                <button
+                  className="action-btn secondary text-xs"
+                  onClick={() => onNavigate('verify_document', { 
+                    credentialId: issuedResult.credential.credentialId,
+                    documentHash: issuedResult.credential.documentHash,
+                    documentId: issuedResult.credential.documentId
+                  })}
                 >
                   <ShieldCheck size={14} /> Verify Issued Credential
+                </button>
+                <button
+                  className="action-btn secondary text-xs"
+                  onClick={() => {
+                    setIssuedResult(null);
+                    setTitle('');
+                  }}
+                >
+                  Issue Another
                 </button>
               </div>
             </div>
@@ -287,6 +307,29 @@ export default function IssueCredential({ onNavigate }) {
           )}
         </div>
       </div>
+
+      {/* Workflow Navigation Footer */}
+      {onNavigate && (
+        <div className="glass-card" style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <span className="text-muted text-xs">Issuer Workflow: Key Status → Issue Credential → Credential Registry</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button 
+              className="action-btn secondary text-xs" 
+              onClick={() => onNavigate('key_status')}
+            >
+              ← Back to Key Status
+            </button>
+            <button 
+              className="action-btn primary text-xs" 
+              onClick={() => onNavigate('credential_list')}
+            >
+              Proceed to Credential Registry →
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

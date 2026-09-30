@@ -3,7 +3,7 @@ import { Building, ShieldCheck, CheckCircle2, AlertTriangle, RefreshCw, Plus, X 
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 
-export default function AdminOrganizations() {
+export default function AdminOrganizations({ onNavigate }) {
   const [organizations, setOrganizations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -100,6 +100,26 @@ export default function AdminOrganizations() {
 
   return (
     <div className="page-content">
+      {/* Admin Governance Flow Banner */}
+      {onNavigate && (
+        <div className="glass-card" style={{ padding: '0.75rem 1.25rem', marginBottom: '1.25rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(139, 92, 246, 0.25)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+            <span className="text-muted" style={{ fontWeight: 700 }}>ADMIN FLOW:</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-purple)' }} onClick={() => onNavigate('dashboard')}>Admin Dashboard</span>
+            <span className="text-muted">→</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-cyan)' }} onClick={() => onNavigate('admin_users')}>Users</span>
+            <span className="text-muted">→</span>
+            <strong style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>Organizations & Trust (Step 2)</strong>
+            <span className="text-muted">→</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-purple)' }} onClick={() => onNavigate('admin_issuers')}>Issuers</span>
+            <span className="text-muted">→</span>
+            <span style={{ cursor: 'pointer', color: 'var(--accent-cyan)' }} onClick={() => onNavigate('admin_trusted_sources')}>Trusted Sources</span>
+            <span className="text-muted">→</span>
+            <span style={{ cursor: 'pointer', color: '#10b981' }} onClick={() => onNavigate('admin_settings')}>System Health</span>
+          </div>
+        </div>
+      )}
+
       <div className="page-header">
         <div>
           <h2>Organization Registry & Institutional Trust</h2>
@@ -265,6 +285,29 @@ export default function AdminOrganizations() {
                 </div>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Governance Navigation Footer */}
+      {onNavigate && (
+        <div className="glass-card" style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <span className="text-muted text-xs">Admin Governance Workflow: Step 2 of 5 (Organizations & Institutional Trust)</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <button 
+              className="action-btn secondary text-xs" 
+              onClick={() => onNavigate('admin_users')}
+            >
+              ← Back to Users Directory
+            </button>
+            <button 
+              className="action-btn primary text-xs"
+              onClick={() => onNavigate('admin_issuers')}
+            >
+              Next: Issuer Accreditation →
+            </button>
           </div>
         </div>
       )}

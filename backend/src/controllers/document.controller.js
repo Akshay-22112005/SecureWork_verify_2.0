@@ -44,8 +44,21 @@ async function downloadDocument(req, res, next) {
   }
 }
 
+/**
+ * List documents (GET /api/documents).
+ */
+async function listDocuments(req, res, next) {
+  try {
+    const documents = await documentService.listDocuments(req.query, req.user);
+    return successResponse(res, { documents }, 200);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   uploadDocument,
   getDocument,
-  downloadDocument
+  downloadDocument,
+  listDocuments
 };

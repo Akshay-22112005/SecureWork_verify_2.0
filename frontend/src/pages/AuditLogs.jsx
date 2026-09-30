@@ -55,6 +55,24 @@ export default function AuditLogs({ onNavigate }) {
         </div>
       </div>
 
+      {/* Auditor Workflow Journey Banner */}
+      <div className="glass-card" style={{ padding: '0.75rem 1.25rem', marginBottom: '1.25rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(0, 240, 255, 0.2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.8rem' }}>
+          <span className="text-muted" style={{ fontWeight: 700 }}>AUDITOR WORKFLOW:</span>
+          <span style={{ cursor: 'pointer', color: 'var(--accent-cyan)' }} onClick={() => onNavigate('dashboard')}>Auditor Dashboard</span>
+          <span className="text-muted">→</span>
+          <strong style={{ color: 'var(--accent-cyan)', textDecoration: 'underline' }}>Audit Logs (Browsing Records)</strong>
+          <span className="text-muted">→</span>
+          <span className="text-muted">Select Event</span>
+          <span className="text-muted">→</span>
+          <span className="text-muted">Event Details</span>
+          <span className="text-muted">→</span>
+          <span style={{ cursor: 'pointer', color: 'var(--accent-purple)' }} onClick={() => onNavigate('verification_evidence')}>Evidence</span>
+          <span className="text-muted">→</span>
+          <span style={{ cursor: 'pointer', color: '#10b981' }} onClick={() => onNavigate('chain_validation')}>Validate Hash Chain</span>
+        </div>
+      </div>
+
       <div className="glass-card" style={{ marginBottom: '1.5rem' }}>
         <div className="search-bar-row">
           <Search size={16} className="search-icon" />
@@ -91,7 +109,12 @@ export default function AuditLogs({ onNavigate }) {
             </thead>
             <tbody>
               {filtered.map((log) => (
-                <tr key={log.sequenceNumber || log.eventId}>
+                <tr 
+                  key={log.sequenceNumber || log.eventId}
+                  onClick={() => setSelectedLog(log)}
+                  style={{ cursor: 'pointer' }}
+                  title="Click to view complete cryptographic event details"
+                >
                   <td><span className="badge-tag">#{log.sequenceNumber}</span></td>
                   <td><strong>{log.action}</strong></td>
                   <td>
@@ -102,7 +125,14 @@ export default function AuditLogs({ onNavigate }) {
                   <td><span className="code-snippet hash-text">{log.currentHash?.slice(0, 18)}...</span></td>
                   <td className="text-muted text-xs">{new Date(log.timestamp || log.createdAt).toLocaleString()}</td>
                   <td>
-                    <button className="icon-action-btn" onClick={() => setSelectedLog(log)} title="Inspect Record">
+                    <button 
+                      className="icon-action-btn" 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedLog(log);
+                      }} 
+                      title="Inspect Record"
+                    >
                       <Eye size={15} />
                     </button>
                   </td>
@@ -116,11 +146,16 @@ export default function AuditLogs({ onNavigate }) {
       {/* Detail Modal */}
       {selectedLog && (
         <div className="modal-overlay" onClick={() => setSelectedLog(null)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '700px' }}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '720px' }}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <GitCommit size={18} className="text-cyan" />
-                <h3>Audit Record #{selectedLog.sequenceNumber} — {selectedLog.action}</h3>
+                <div>
+                  <h3 style={{ margin: 0 }}>Audit Record #{selectedLog.sequenceNumber} — {selectedLog.action}</h3>
+                  <div className="text-muted text-xs" style={{ marginTop: '0.2rem' }}>
+                    Auditor Pipeline: Select Event → <strong>Event Details (Active)</strong> → Evidence → Validate Hash Chain
+                  </div>
+                </div>
               </div>
               <button className="close-btn" onClick={() => setSelectedLog(null)}><X size={18} /></button>
             </div>
@@ -156,6 +191,40 @@ export default function AuditLogs({ onNavigate }) {
                 <h4>Event Metadata Payload</h4>
                 <div className="json-code-box">
                   <pre>{JSON.stringify(selectedLog.metadata, null, 2)}</pre>
+                </div>
+              </div>
+
+              <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', paddingTop: '1rem', borderTop: '1px solid var(--border-subtle)' }}>
+                <button 
+                  className="action-btn secondary text-xs"
+                  onClick={() => setSelectedLog(null)}
+                >
+                  Close Details
+                </button>
+                <div style={{ display: 'flex', gap: '0.6rem' }}>
+                  <button 
+                    className="action-btn primary text-xs"
+                    onClick={() => {
+                      const vId = selectedLog.metadata?.verificationId || (typeof selectedLog.targetResource === 'string' && selectedLog.targetResource.startsWith('vrf_') ? selectedLog.targetResource : undefined);
+                      const cId = selectedLog.metadata?.credentialId || (typeof selectedLog.targetResource === 'string' && selectedLog.targetResource.startsWith('cred_') ? selectedLog.targetResource : undefined);
+                      setSelectedLog(null);
+                      onNavigate('verification_evidence', { verificationId: vId, credentialId: cId });
+                    }}
+                    title="Transition to discrete evidence inspection for this event"
+                  >
+                    Evidence Store →
+                  </button>
+                  <button 
+                    className="action-btn secondary text-xs"
+                    style={{ borderColor: 'rgba(16, 185, 129, 0.4)', color: '#10b981' }}
+                    onClick={() => {
+                      setSelectedLog(null);
+                      onNavigate('chain_validation');
+                    }}
+                    title="Transition directly to bitwise audit chain validation"
+                  >
+                    <GitCommit size={13} /> Validate Hash Chain →
+                  </button>
                 </div>
               </div>
             </div>

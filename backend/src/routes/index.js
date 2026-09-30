@@ -75,6 +75,7 @@ router.get('/', (req, res) => {
         revoke: 'PATCH /api/issuer-keys/:id/revoke'
       },
       documents: {
+        list: 'GET /api/documents',
         upload: 'POST /api/documents/upload',
         getById: 'GET /api/documents/:id',
         download: 'GET /api/documents/:id/download'

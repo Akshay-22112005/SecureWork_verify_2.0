@@ -20,6 +20,8 @@ export const api = {
       return apiClient(`/users${q ? `?${q}` : ''}`);
     },
     getById: (id) => apiClient(`/users/${id}`),
+    getMe: () => apiClient('/users/me'),
+    updateMe: (data) => apiClient('/users/me', { method: 'PATCH', body: data }),
     updateRole: (id, role) => apiClient(`/users/${id}/role`, { method: 'PATCH', body: { role } })
   },
 
@@ -76,7 +78,7 @@ export const api = {
     },
     getById: (id) => apiClient(`/organizations/${id}`),
     create: (data) => apiClient('/organizations', { method: 'POST', body: data }),
-    verify: (id, data = {}) => apiClient(`/organizations/${id}/verify`, { method: 'PATCH', body: data }),
+    verify: (id, data = {}) => apiClient(`/organizations/${id}/verify`, { method: 'POST', body: data }),
     suspend: (id, reason) => apiClient(`/organizations/${id}/suspend`, { method: 'PATCH', body: { reason } }),
     revoke: (id, reason) => apiClient(`/organizations/${id}/revoke`, { method: 'PATCH', body: { reason } })
   },
@@ -88,10 +90,11 @@ export const api = {
       return apiClient(`/issuers${q ? `?${q}` : ''}`);
     },
     getById: (id) => apiClient(`/issuers/${id}`),
-    register: (data) => apiClient('/issuers', { method: 'POST', body: data }),
+    register: (data) => apiClient('/issuers/register', { method: 'POST', body: data }),
     approve: (id) => apiClient(`/issuers/${id}/approve`, { method: 'PATCH' }),
     suspend: (id, reason) => apiClient(`/issuers/${id}/suspend`, { method: 'PATCH', body: { reason } }),
-    revoke: (id, reason) => apiClient(`/issuers/${id}/revoke`, { method: 'PATCH', body: { reason } })
+    revoke: (id, reason) => apiClient(`/issuers/${id}/revoke`, { method: 'PATCH', body: { reason } }),
+    rotateKey: (id, data = {}) => apiClient(`/issuers/${id}/rotate-key`, { method: 'POST', body: data })
   },
 
   // Issuer Keys
@@ -101,8 +104,9 @@ export const api = {
       return apiClient(`/issuer-keys${q ? `?${q}` : ''}`);
     },
     getById: (id) => apiClient(`/issuer-keys/${id}`),
-    rotate: (issuerId) => apiClient('/issuer-keys/rotate', { method: 'POST', body: { issuerId } }),
-    compromise: (keyId, reason) => apiClient(`/issuer-keys/${keyId}/compromise`, { method: 'PATCH', body: { reason } })
+    rotate: (issuerId, data = {}) => apiClient(`/issuers/${issuerId}/rotate-key`, { method: 'POST', body: data }),
+    compromise: (keyId, reason) => apiClient(`/issuer-keys/${keyId}/compromise`, { method: 'PATCH', body: { reason } }),
+    revoke: (keyId, reason) => apiClient(`/issuer-keys/${keyId}/revoke`, { method: 'PATCH', body: { reason } })
   },
 
   // Trusted Sources
@@ -115,7 +119,8 @@ export const api = {
     register: (data) => apiClient('/trusted-sources', { method: 'POST', body: data }),
     approve: (id) => apiClient(`/trusted-sources/${id}/approve`, { method: 'PATCH' }),
     suspend: (id, reason) => apiClient(`/trusted-sources/${id}/suspend`, { method: 'PATCH', body: { reason } }),
-    revoke: (id, reason) => apiClient(`/trusted-sources/${id}/revoke`, { method: 'PATCH', body: { reason } })
+    revoke: (id, reason) => apiClient(`/trusted-sources/${id}/revoke`, { method: 'PATCH', body: { reason } }),
+    verifyDomain: (id) => apiClient(`/trusted-sources/${id}/verify-domain`, { method: 'POST' })
   },
 
   // Audit Logs & Hash Chain

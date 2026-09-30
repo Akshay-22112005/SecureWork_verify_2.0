@@ -13,7 +13,10 @@ export function AuthProvider({ children }) {
       return null;
     }
   });
-  const [token, setToken] = useState(() => localStorage.getItem('securework_token'));
+  const [token, setToken] = useState(() => {
+    const saved = localStorage.getItem('securework_token');
+    return (saved && saved !== 'null' && saved !== 'undefined') ? saved : null;
+  });
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
 
@@ -22,13 +25,15 @@ export function AuthProvider({ children }) {
     setSessionExpiredHandler(() => {
       setUser(null);
       setToken(null);
+      localStorage.removeItem('securework_token');
+      localStorage.removeItem('securework_user');
     });
   }, []);
 
   // Fetch current user details on mount if token exists
   useEffect(() => {
     async function loadMe() {
-      if (!token) {
+      if (!token || token === 'null' || token === 'undefined') {
         setLoading(false);
         return;
       }
@@ -84,6 +89,7 @@ export function AuthProvider({ children }) {
   }
 
   const role = user?.role || 'GUEST';
+  const isAuthenticated = Boolean(user && token);
   const isAdmin = role === 'ADMIN';
   const isAuditor = role === 'AUDITOR';
   const isIssuer = role === 'ISSUER';
@@ -96,6 +102,7 @@ export function AuthProvider({ children }) {
         user,
         token,
         role,
+        isAuthenticated,
         loading,
         authError,
         setAuthError,

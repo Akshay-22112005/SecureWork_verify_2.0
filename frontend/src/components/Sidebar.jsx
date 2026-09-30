@@ -35,7 +35,8 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
     {
       title: 'General',
       items: [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }
+        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'verify_document', label: 'Public Verification', icon: ShieldCheck }
       ]
     },
     {
@@ -43,9 +44,8 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
       visible: isUser || isAdmin,
       items: [
         { id: 'upload_document', label: 'Upload Document', icon: UploadCloud },
-        { id: 'verify_document', label: 'Verify Document', icon: ShieldCheck },
-        { id: 'verification_history', label: 'Verification History', icon: History },
         { id: 'my_credentials', label: 'My Credentials', icon: Award },
+        { id: 'verification_history', label: 'Verification History', icon: History },
         { id: 'document_analysis', label: 'Document Analysis (OCR/AI)', icon: FileSearch }
       ]
     },
@@ -65,6 +65,7 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
       items: [
         { id: 'hr_verify', label: 'HR Verify Document', icon: ShieldCheck },
         { id: 'verify_source', label: 'Verify Official Source', icon: ExternalLink },
+        { id: 'verification_evidence', label: 'Verification Evidence', icon: CheckSquare },
         { id: 'hr_history', label: 'Candidate Verification Logs', icon: History }
       ]
     },

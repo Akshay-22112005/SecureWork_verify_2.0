@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Key, RefreshCw, AlertOctagon, ShieldCheck, CheckCircle2, AlertTriangle, X } from 'lucide-react';
+import { Key, RefreshCw, AlertOctagon, ShieldCheck, CheckCircle2, AlertTriangle, X, Award } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import StatusBadge from '../components/StatusBadge';
 
-export default function KeyStatus() {
+export default function KeyStatus({ onNavigate }) {
   const { user } = useAuth();
   const [keys, setKeys] = useState([]);
   const [activeIssuer, setActiveIssuer] = useState(null);
@@ -146,8 +146,13 @@ export default function KeyStatus() {
               <span className="text-muted text-xs">{new Date(activeKey.createdAt).toLocaleString()}</span>
             </div>
 
-            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem' }}>
-              <button className="action-btn primary text-xs" onClick={handleRotateKey}>
+            <div style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              {onNavigate && (
+                <button className="action-btn primary text-xs" onClick={() => onNavigate('issue_credential')}>
+                  <Award size={14} /> Proceed to Issue Credential →
+                </button>
+              )}
+              <button className="action-btn secondary text-xs" onClick={handleRotateKey}>
                 <RefreshCw size={14} /> Rotate Signing Key
               </button>
               <button 
@@ -246,6 +251,28 @@ export default function KeyStatus() {
                 </div>
               </form>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Workflow Navigation Footer */}
+      {onNavigate && (
+        <div className="glass-card" style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <span className="text-muted text-xs">Issuer Workflow: Issuer Status → Key Status → Issue Credential</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button 
+              className="action-btn secondary text-xs" 
+              onClick={() => onNavigate('issuer_status')}
+            >
+              ← Back to Issuer Status
+            </button>
+            <button 
+              className="action-btn primary text-xs"
+              onClick={() => onNavigate('issue_credential')}
+            >
+              Proceed to Issue Credential →
+            </button>
           </div>
         </div>
       )}

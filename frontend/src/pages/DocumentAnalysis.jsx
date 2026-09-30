@@ -3,7 +3,7 @@ import { Cpu, FileText, AlertTriangle, CheckCircle2, RefreshCw, AlertOctagon, Se
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 
-export default function DocumentAnalysis({ initialParams = {} }) {
+export default function DocumentAnalysis({ initialParams = {}, onNavigate }) {
   const [documentId, setDocumentId] = useState(initialParams.documentId || '');
   const [ocrResult, setOcrResult] = useState(null);
   const [aiResult, setAiResult] = useState(null);
@@ -13,6 +13,7 @@ export default function DocumentAnalysis({ initialParams = {} }) {
 
   useEffect(() => {
     if (initialParams.documentId) {
+      setDocumentId(initialParams.documentId);
       loadStoredAnalysis(initialParams.documentId);
     }
   }, [initialParams.documentId]);
@@ -228,6 +229,35 @@ export default function DocumentAnalysis({ initialParams = {} }) {
           )}
         </div>
       </div>
+
+      {/* Workflow Navigation Footer */}
+      {onNavigate && (
+        <div className="glass-card" style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+          <div>
+            <span className="text-muted text-xs">Credential Holder Workflow: Upload Document → Document Analysis → My Credentials</span>
+          </div>
+          <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <button 
+              className="action-btn secondary text-xs" 
+              onClick={() => onNavigate('upload_document')}
+            >
+              ← Upload Another
+            </button>
+            <button 
+              className="action-btn primary text-xs"
+              onClick={() => onNavigate('my_credentials', { documentId })}
+            >
+              Proceed to My Credentials →
+            </button>
+            <button 
+              className="action-btn secondary text-xs"
+              onClick={() => onNavigate('verify_document', { documentId })}
+            >
+              Verify Document
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
