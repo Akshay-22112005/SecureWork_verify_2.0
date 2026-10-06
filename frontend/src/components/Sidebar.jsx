@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { 
   LayoutDashboard, 
   UploadCloud, 
@@ -22,9 +23,39 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMobile }) {
   const { role, isAdmin, isAuditor, isIssuer, isHr, isUser } = useAuth();
+  const location = useLocation();
+  const currentPath = location?.pathname || '';
+
+  // Mapping from item ID to path
+  const itemPaths = {
+    dashboard: '/dashboard',
+    verify_document: '/verify',
+    upload_document: '/upload',
+    my_credentials: '/credentials',
+    verification_history: '/history',
+    document_analysis: '/analysis',
+    issuer_status: '/issuer/status',
+    issue_credential: '/credentials/issue',
+    credential_list: '/credentials/all',
+    key_status: '/keys',
+    hr_verify: '/verify',
+    verify_source: '/trusted-sources/verify',
+    verification_evidence: '/audit/evidence',
+    hr_history: '/history',
+    audit_logs: '/audit/logs',
+    chain_validation: '/audit/chain',
+    admin_users: '/admin/users',
+    admin_organizations: '/admin/organizations',
+    admin_trusted_sources: '/admin/trusted-sources',
+    admin_issuers: '/admin/issuers',
+    admin_settings: '/admin/settings'
+  };
 
   function handleItemClick(itemId) {
-    onNavigate(itemId);
+    const targetPath = itemPaths[itemId] || `/${itemId}`;
+    if (onNavigate) {
+      onNavigate(targetPath);
+    }
     if (onCloseMobile) {
       onCloseMobile();
     }
@@ -35,58 +66,58 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
     {
       title: 'General',
       items: [
-        { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'verify_document', label: 'Public Verification', icon: ShieldCheck }
+        { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'verify_document', path: '/verify', label: 'Public Verification', icon: ShieldCheck }
       ]
     },
     {
       title: 'User / Credential Holder',
       visible: isUser || isAdmin,
       items: [
-        { id: 'upload_document', label: 'Upload Document', icon: UploadCloud },
-        { id: 'my_credentials', label: 'My Credentials', icon: Award },
-        { id: 'verification_history', label: 'Verification History', icon: History },
-        { id: 'document_analysis', label: 'Document Analysis (OCR/AI)', icon: FileSearch }
+        { id: 'upload_document', path: '/upload', label: 'Upload Document', icon: UploadCloud },
+        { id: 'my_credentials', path: '/credentials', label: 'My Credentials', icon: Award },
+        { id: 'verification_history', path: '/history', label: 'Verification History', icon: History },
+        { id: 'document_analysis', path: '/analysis', label: 'Document Analysis (OCR/AI)', icon: FileSearch }
       ]
     },
     {
       title: 'Issuer Management',
       visible: isIssuer || isAdmin,
       items: [
-        { id: 'issuer_status', label: 'Issuer Status', icon: FileBadge },
-        { id: 'issue_credential', label: 'Issue Credential', icon: Award },
-        { id: 'credential_list', label: 'Credential List', icon: FileSpreadsheet },
-        { id: 'key_status', label: 'Cryptographic Key Status', icon: Key }
+        { id: 'issuer_status', path: '/issuer/status', label: 'Issuer Status', icon: FileBadge },
+        { id: 'issue_credential', path: '/credentials/issue', label: 'Issue Credential', icon: Award },
+        { id: 'credential_list', path: '/credentials/all', label: 'Credential List', icon: FileSpreadsheet },
+        { id: 'key_status', path: '/keys', label: 'Cryptographic Key Status', icon: Key }
       ]
     },
     {
       title: 'HR / Verifier',
       visible: isHr || isAdmin,
       items: [
-        { id: 'hr_verify', label: 'HR Verify Document', icon: ShieldCheck },
-        { id: 'verify_source', label: 'Verify Official Source', icon: ExternalLink },
-        { id: 'verification_evidence', label: 'Verification Evidence', icon: CheckSquare },
-        { id: 'hr_history', label: 'Candidate Verification Logs', icon: History }
+        { id: 'hr_verify', path: '/verify', label: 'HR Verify Document', icon: ShieldCheck },
+        { id: 'verify_source', path: '/trusted-sources/verify', label: 'Verify Official Source', icon: ExternalLink },
+        { id: 'verification_evidence', path: '/audit/evidence', label: 'Verification Evidence', icon: CheckSquare },
+        { id: 'hr_history', path: '/history', label: 'Candidate Verification Logs', icon: History }
       ]
     },
     {
       title: 'Auditor & Compliance',
       visible: isAuditor || isAdmin,
       items: [
-        { id: 'audit_logs', label: 'Hash-Chained Audit Logs', icon: History },
-        { id: 'verification_evidence', label: 'Verification Evidence', icon: CheckSquare },
-        { id: 'chain_validation', label: 'Audit Chain Validation', icon: GitCommit }
+        { id: 'audit_logs', path: '/audit/logs', label: 'Hash-Chained Audit Logs', icon: History },
+        { id: 'verification_evidence', path: '/audit/evidence', label: 'Verification Evidence', icon: CheckSquare },
+        { id: 'chain_validation', path: '/audit/chain', label: 'Audit Chain Validation', icon: GitCommit }
       ]
     },
     {
       title: 'Administration',
       visible: isAdmin,
       items: [
-        { id: 'admin_users', label: 'User Directory & RBAC', icon: Users },
-        { id: 'admin_organizations', label: 'Organizations & Trust', icon: Building },
-        { id: 'admin_trusted_sources', label: 'Trusted Sources (SSRF Safe)', icon: Link2 },
-        { id: 'admin_issuers', label: 'Issuer Accreditation', icon: FileBadge },
-        { id: 'admin_settings', label: 'System Health & Settings', icon: Settings }
+        { id: 'admin_users', path: '/admin/users', label: 'User Directory & RBAC', icon: Users },
+        { id: 'admin_organizations', path: '/admin/organizations', label: 'Organizations & Trust', icon: Building },
+        { id: 'admin_trusted_sources', path: '/admin/trusted-sources', label: 'Trusted Sources (SSRF Safe)', icon: Link2 },
+        { id: 'admin_issuers', path: '/admin/issuers', label: 'Issuer Accreditation', icon: FileBadge },
+        { id: 'admin_settings', path: '/admin/settings', label: 'System Health & Settings', icon: Settings }
       ]
     }
   ];
@@ -124,12 +155,13 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
                 <div className="nav-item-list">
                   {sec.items.map((item) => {
                     const ItemIcon = item.icon;
-                    const isActive = activePage === item.id;
+                    const isActive = currentPath === item.path || activePage === item.id;
                     return (
                       <button
                         key={item.id}
                         className={`nav-item-btn ${isActive ? 'active' : ''}`}
                         onClick={() => handleItemClick(item.id)}
+                        aria-current={isActive ? 'page' : undefined}
                       >
                         <ItemIcon size={17} className="nav-item-icon" />
                         <span className="nav-item-label">{item.label}</span>

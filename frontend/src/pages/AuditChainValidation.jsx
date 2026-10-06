@@ -1,31 +1,36 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
+import { animate, stagger } from "animejs";
 import {
   GitCommit, ShieldCheck, AlertOctagon, CheckCircle2,
   RefreshCw, Anchor, History, AlertTriangle, Link, ZoomIn, ZoomOut
 } from "lucide-react";
 import api from "../services/api";
 import StatusBadge from "../components/StatusBadge";
+import { useReducedMotion } from "../hooks/useReducedMotion";
 
 /* ─── mini SVG block explorer ─────────────────────────────── */
 function BlockCard({ entry, index, isBroken, isFirst }) {
   const statusColor = isBroken ? "var(--color-danger)" : "#10b981";
   return (
-    <div style={{
-      display: "flex", alignItems: "stretch", gap: 0,
-      opacity: 1, animation: "fadeIn 0.3s ease"
-    }}>
+    <div 
+      className="audit-block-card-wrapper"
+      style={{
+        display: "flex", alignItems: "stretch", gap: 0,
+        opacity: 0, transform: "translateY(16px)"
+      }}
+    >
       {/* connector arrow (not first) */}
       {!isFirst && (
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "36px", flexShrink: 0 }}>
+        <div className="audit-block-connector" style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", width: "36px", flexShrink: 0 }}>
           <div style={{ width: "100%", height: "2px", background: isBroken ? "var(--color-danger)" : "rgba(16,185,129,0.4)" }} />
           <div style={{ fontSize: "0.6rem", color: isBroken ? "var(--color-danger)" : "rgba(16,185,129,0.6)", marginTop: "-2px" }}>&#9654;</div>
         </div>
       )}
       {/* block */}
-      <div style={{
+      <div className="glass-card" style={{
         border: `1.5px solid ${isBroken ? "rgba(239,68,68,0.5)" : "rgba(16,185,129,0.25)"}`,
-        borderRadius: "8px", padding: "0.75rem", minWidth: "200px", maxWidth: "220px",
-        background: isBroken ? "rgba(239,68,68,0.05)" : "rgba(16,185,129,0.04)",
+        borderRadius: "var(--radius-md)", padding: "0.85rem", minWidth: "210px", maxWidth: "230px",
+        background: isBroken ? "var(--red-bg)" : "var(--emerald-bg)",
         position: "relative", flexShrink: 0
       }}>
         {/* index badge */}
@@ -87,7 +92,40 @@ export default function AuditChainValidation({ onNavigate }) {
     } catch {}
   }
 
-  useEffect(() => { runValidation(); loadCheckpoints(); loadRecentEntries(); }, []);
+  const prefersReducedMotion = useReducedMotion();
+
+  useEffect(() => {
+    runValidation(); 
+    loadCheckpoints(); 
+    loadRecentEntries(); 
+  }, []);
+
+  // Sequential animation of blocks and connectors with animejs
+  useEffect(() => {
+    if (!explorerRef.current || recentEntries.length === 0) return;
+    const cards = explorerRef.current.querySelectorAll('.audit-block-card-wrapper');
+    if (!cards || cards.length === 0) return;
+
+    if (prefersReducedMotion) {
+      cards.forEach((c) => { c.style.opacity = '1'; c.style.transform = 'none'; });
+      return;
+    }
+
+    try {
+      const anim = animate(cards, {
+        opacity: [0, 1],
+        translateY: [16, 0],
+        duration: 400,
+        delay: stagger(90, { start: 100 }),
+        ease: 'outBack'
+      });
+      return () => {
+        if (anim && typeof anim.cancel === 'function') anim.cancel();
+      };
+    } catch {
+      cards.forEach((c) => { c.style.opacity = '1'; c.style.transform = 'none'; });
+    }
+  }, [recentEntries, prefersReducedMotion]);
 
   async function handleCreateCheckpoint() {
     setCheckpointing(true); setCheckpointMsg("");

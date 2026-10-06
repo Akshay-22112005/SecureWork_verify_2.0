@@ -1,19 +1,19 @@
-import React, { useState } from 'react';
-import { Shield } from 'lucide-react';
+import React from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 
-import Navbar from './components/Navbar';
-import Sidebar from './components/Sidebar';
-import NotificationDrawer from './components/NotificationDrawer';
+import AppLayout from './layouts/AppLayout';
+import ProtectedRoute from './components/ProtectedRoute';
+import RoleRoute from './components/RoleRoute';
 
 // Public & Auth Pages
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
 
-// Dashboard & Core Operations Pages
+// Dashboard & Operations Pages
 import UserDashboard from './pages/UserDashboard';
 import UploadDocument from './pages/UploadDocument';
 import VerifyDocument from './pages/VerifyDocument';
@@ -34,140 +34,199 @@ import AuditLogs from './pages/AuditLogs';
 import VerificationEvidence from './pages/VerificationEvidence';
 import AuditChainValidation from './pages/AuditChainValidation';
 
-function MainApp() {
-  const { user, loading } = useAuth();
-  // Default to landing page if not authenticated, otherwise dashboard
-  const [activePage, setActivePage] = useState(() => {
-    try {
-      const savedToken = localStorage.getItem('securework_token');
-      return savedToken ? 'dashboard' : 'landing';
-    } catch {
-      return 'landing';
+// Navigation wrapper for pages expecting an onNavigate function
+function PageWrapper({ Component, ...rest }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  function handleNavigate(pageIdOrPath, params = {}) {
+    if (typeof pageIdOrPath === 'string') {
+      if (pageIdOrPath.startsWith('/')) {
+        navigate(pageIdOrPath, { state: params });
+      } else {
+        const pathMap = {
+          dashboard: '/dashboard',
+          upload_document: '/upload',
+          verify_document: '/verify',
+          hr_verify: '/verify',
+          verification_history: '/history',
+          hr_history: '/history',
+          my_credentials: '/credentials',
+          issue_credential: '/credentials/issue',
+          credential_list: '/credentials/all',
+          document_analysis: '/analysis',
+          issuer_status: '/issuer/status',
+          key_status: '/keys',
+          verify_source: '/trusted-sources/verify',
+          admin_users: '/admin/users',
+          admin_organizations: '/admin/organizations',
+          admin_trusted_sources: '/admin/trusted-sources',
+          admin_issuers: '/admin/issuers',
+          admin_settings: '/admin/settings',
+          audit_logs: '/audit/logs',
+          verification_evidence: '/audit/evidence',
+          chain_validation: '/audit/chain',
+          landing: '/',
+          login: '/login',
+          register: '/register'
+        };
+        navigate(pathMap[pageIdOrPath] || '/dashboard', { state: params });
+      }
     }
-  });
-  const [pageParams, setPageParams] = useState({});
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-
-  function handleNavigate(pageId, params = {}) {
-    setActivePage(pageId);
-    setPageParams(params);
-    setMobileMenuOpen(false);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function handleToggleMobileMenu() {
-    setMobileMenuOpen((prev) => !prev);
-  }
+  return <Component onNavigate={handleNavigate} initialParams={location.state || {}} {...rest} />;
+}
 
-  function handleCloseMobileMenu() {
-    setMobileMenuOpen(false);
-  }
+export function AppRoutes() {
+  const navigate = useNavigate();
 
-  if (loading) {
-    return (
-      <div className="loading-screen">
-        <div className="crypto-loader-container">
-          <div className="crypto-loader-rings">
-            <div className="ring ring-outer"></div>
-            <div className="ring ring-middle"></div>
-            <div className="ring ring-inner"></div>
-            <div className="loader-core-icon">
-              <Shield size={34} />
-            </div>
-          </div>
-          <div className="crypto-loader-text">
-            <h3>SecureWork Verify</h3>
-            <p>Initializing Cryptographic Verification Engine...</p>
-            <div className="crypto-loader-bar">
-              <div className="crypto-loader-progress"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // 1. Standalone Landing Page (shown before login or when explicitly navigated)
-  if (activePage === 'landing' || (!user && (activePage === 'dashboard' || !activePage))) {
-    return <LandingPage onNavigate={handleNavigate} />;
-  }
-
-  // 2. Standalone Auth Pages
-  if (activePage === 'login') {
-    return <Login onNavigate={handleNavigate} />;
-  }
-  if (activePage === 'register') {
-    return <Register onNavigate={handleNavigate} />;
-  }
-
-  function renderPage() {
-    switch (activePage) {
-      case 'dashboard':
-        return <UserDashboard onNavigate={handleNavigate} />;
-      case 'upload_document':
-        return <UploadDocument onNavigate={handleNavigate} />;
-      case 'verify_document':
-      case 'hr_verify':
-        return <VerifyDocument initialParams={pageParams} onNavigate={handleNavigate} />;
-      case 'verification_history':
-      case 'hr_history':
-        return <VerificationHistory onNavigate={handleNavigate} />;
-      case 'my_credentials':
-        return <MyCredentials onNavigate={handleNavigate} />;
-      case 'document_analysis':
-        return <DocumentAnalysis initialParams={pageParams} onNavigate={handleNavigate} />;
-      case 'issuer_status':
-        return <IssuerStatus onNavigate={handleNavigate} />;
-      case 'issue_credential':
-        return <IssueCredential onNavigate={handleNavigate} />;
-      case 'credential_list':
-        return <CredentialList onNavigate={handleNavigate} />;
-      case 'key_status':
-        return <KeyStatus onNavigate={handleNavigate} />;
-      case 'verify_source':
-        return <VerifyOfficialSource onNavigate={handleNavigate} />;
-      case 'admin_users':
-        return <AdminUsers onNavigate={handleNavigate} />;
-      case 'admin_organizations':
-        return <AdminOrganizations onNavigate={handleNavigate} />;
-      case 'admin_trusted_sources':
-        return <AdminTrustedSources onNavigate={handleNavigate} />;
-      case 'admin_issuers':
-        return <AdminIssuers onNavigate={handleNavigate} />;
-      case 'admin_settings':
-        return <AdminSystemSettings onNavigate={handleNavigate} />;
-      case 'audit_logs':
-        return <AuditLogs onNavigate={handleNavigate} />;
-      case 'verification_evidence':
-        return <VerificationEvidence initialParams={pageParams} onNavigate={handleNavigate} />;
-      case 'chain_validation':
-        return <AuditChainValidation onNavigate={handleNavigate} />;
-      default:
-        return <UserDashboard onNavigate={handleNavigate} />;
+  function handleLandingNavigate(pageIdOrPath, params = {}) {
+    if (typeof pageIdOrPath === 'string') {
+      if (pageIdOrPath.startsWith('/')) {
+        navigate(pageIdOrPath, { state: params });
+      } else {
+        const pathMap = {
+          dashboard: '/dashboard',
+          login: '/login',
+          register: '/register',
+          verify_document: '/verify',
+          chain_validation: '/audit/chain',
+          key_status: '/keys',
+          verification_evidence: '/audit/evidence'
+        };
+        navigate(pathMap[pageIdOrPath] || `/${pageIdOrPath}`, { state: params });
+      }
     }
   }
 
   return (
-    <div className="app-layout">
-      <Navbar 
-        onNavigate={handleNavigate} 
-        activePage={activePage} 
-        onToggleMobileMenu={handleToggleMobileMenu}
-        mobileMenuOpen={mobileMenuOpen}
-      />
-      <div className="app-body">
-        <Sidebar 
-          activePage={activePage} 
-          onNavigate={handleNavigate} 
-          mobileOpen={mobileMenuOpen}
-          onCloseMobile={handleCloseMobileMenu}
+    <Routes>
+      {/* ─── Public Landing & Auth Routes ─── */}
+      <Route path="/" element={<LandingPage onNavigate={handleLandingNavigate} />} />
+      <Route path="/login" element={<PageWrapper Component={Login} />} />
+      <Route path="/register" element={<PageWrapper Component={Register} />} />
+
+      {/* ─── Public Direct Verification Deep-Link (No Login Required) ─── */}
+      <Route path="/verify/:credentialId" element={<PageWrapper Component={VerifyDocument} />} />
+
+      {/* ─── Authenticated Application Shell ─── */}
+      <Route
+        element={
+          <ProtectedRoute>
+            <AppLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="/dashboard" element={<PageWrapper Component={UserDashboard} />} />
+        <Route path="/upload" element={<PageWrapper Component={UploadDocument} />} />
+        <Route path="/verify" element={<PageWrapper Component={VerifyDocument} />} />
+        <Route path="/history" element={<PageWrapper Component={VerificationHistory} />} />
+        <Route path="/credentials" element={<PageWrapper Component={MyCredentials} />} />
+        <Route path="/analysis" element={<PageWrapper Component={DocumentAnalysis} />} />
+
+        {/* Issuer Protected Routes */}
+        <Route
+          path="/credentials/issue"
+          element={
+            <RoleRoute allowedRoles={['ADMIN', 'ISSUER']}>
+              <PageWrapper Component={IssueCredential} />
+            </RoleRoute>
+          }
         />
-        <main className="main-content-area" id="main-content">
-          {renderPage()}
-        </main>
-      </div>
-      <NotificationDrawer />
-    </div>
+        <Route
+          path="/credentials/all"
+          element={
+            <RoleRoute allowedRoles={['ADMIN', 'ISSUER']}>
+              <PageWrapper Component={CredentialList} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/issuer/status"
+          element={
+            <RoleRoute allowedRoles={['ADMIN', 'ISSUER']}>
+              <PageWrapper Component={IssuerStatus} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/keys"
+          element={
+            <RoleRoute allowedRoles={['ADMIN', 'ISSUER']}>
+              <PageWrapper Component={KeyStatus} />
+            </RoleRoute>
+          }
+        />
+
+        {/* HR & Verifier Routes */}
+        <Route
+          path="/trusted-sources/verify"
+          element={
+            <RoleRoute allowedRoles={['ADMIN', 'HR']}>
+              <PageWrapper Component={VerifyOfficialSource} />
+            </RoleRoute>
+          }
+        />
+
+        {/* Auditor & Compliance Routes */}
+        <Route
+          path="/audit/logs"
+          element={
+            <RoleRoute allowedRoles={['ADMIN', 'AUDITOR']}>
+              <PageWrapper Component={AuditLogs} />
+            </RoleRoute>
+          }
+        />
+        <Route path="/audit/evidence" element={<PageWrapper Component={VerificationEvidence} />} />
+        <Route path="/audit/chain" element={<PageWrapper Component={AuditChainValidation} />} />
+
+        {/* Administration Routes */}
+        <Route
+          path="/admin/users"
+          element={
+            <RoleRoute allowedRoles={['ADMIN']}>
+              <PageWrapper Component={AdminUsers} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/admin/organizations"
+          element={
+            <RoleRoute allowedRoles={['ADMIN']}>
+              <PageWrapper Component={AdminOrganizations} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/admin/trusted-sources"
+          element={
+            <RoleRoute allowedRoles={['ADMIN']}>
+              <PageWrapper Component={AdminTrustedSources} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/admin/issuers"
+          element={
+            <RoleRoute allowedRoles={['ADMIN']}>
+              <PageWrapper Component={AdminIssuers} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/admin/settings"
+          element={
+            <RoleRoute allowedRoles={['ADMIN']}>
+              <PageWrapper Component={AdminSystemSettings} />
+            </RoleRoute>
+          }
+        />
+      </Route>
+
+      {/* Fallback */}
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   );
 }
 
@@ -176,7 +235,9 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <NotificationProvider>
-          <MainApp />
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
         </NotificationProvider>
       </AuthProvider>
     </ThemeProvider>

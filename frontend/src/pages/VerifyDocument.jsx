@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useParams, useLocation } from 'react-router-dom';
 import { 
   ShieldCheck, Search, AlertCircle, RefreshCw, CheckCircle2, ShieldAlert,
   Download, FileText, QrCode, Globe, ShieldX, Key, Hash, Award, CheckSquare, Zap, Copy, ExternalLink
@@ -10,9 +11,15 @@ import { useAuth } from '../context/AuthContext';
 
 export default function VerifyDocument({ initialParams = {}, onNavigate }) {
   const { user, isAdmin, isAuditor, isHr, role } = useAuth();
-  const [credentialId, setCredentialId] = useState(initialParams.credentialId || '');
-  const [documentHash, setDocumentHash] = useState(initialParams.documentHash || '');
-  const [documentId, setDocumentId] = useState(initialParams.documentId || '');
+  const routeParams = useParams();
+  const location = useLocation();
+  const initialCred = routeParams?.credentialId || location?.state?.credentialId || initialParams?.credentialId || '';
+  const initialDocHash = location?.state?.documentHash || initialParams?.documentHash || '';
+  const initialDocId = location?.state?.documentId || initialParams?.documentId || '';
+
+  const [credentialId, setCredentialId] = useState(initialCred);
+  const [documentHash, setDocumentHash] = useState(initialDocHash);
+  const [documentId, setDocumentId] = useState(initialDocId);
   const [candidateCredentials, setCandidateCredentials] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
