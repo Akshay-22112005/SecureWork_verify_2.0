@@ -1,4 +1,4 @@
-import { apiClient } from './client';
+import { apiClient, API_BASE } from './client';
 
 export const api = {
   // Health

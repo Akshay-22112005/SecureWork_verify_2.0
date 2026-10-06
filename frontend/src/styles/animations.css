@@ -1,0 +1,217 @@
+/* ==========================================================================
+   SecureWork Verify — Animations & Motion Layer (Anime.js & Trust Inspired)
+   ========================================================================== */
+
+/* Floating Geometric Shapes (Playful, smooth Anime.js inspired motion) */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-16px) rotate(4deg);
+  }
+}
+
+@keyframes float-reverse {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(14px) rotate(-5deg);
+  }
+}
+
+@keyframes float-drift {
+  0% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+  33% {
+    transform: translate(12px, -18px) rotate(6deg);
+  }
+  66% {
+    transform: translate(-10px, 10px) rotate(-4deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0deg);
+  }
+}
+
+.animate-float-slow {
+  animation: float-slow 7s ease-in-out infinite;
+}
+
+.animate-float-reverse {
+  animation: float-reverse 8.5s ease-in-out infinite;
+}
+
+.animate-float-drift {
+  animation: float-drift 11s ease-in-out infinite;
+}
+
+/* Credential Holographic Scan Laser Beam */
+@keyframes laser-scan {
+  0% {
+    top: 0%;
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    top: 96%;
+    opacity: 0;
+  }
+}
+
+.animate-scan-beam {
+  animation: laser-scan 2.8s cubic-bezier(0.45, 0.05, 0.55, 0.95) infinite;
+}
+
+/* Status Verification Visuals */
+/* 1. VALID: Smooth Shield Glow & Spring Pop */
+@keyframes shield-pop {
+  0% {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+  60% {
+    transform: scale(1.08);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes check-draw {
+  0% {
+    stroke-dashoffset: 50;
+  }
+  100% {
+    stroke-dashoffset: 0;
+  }
+}
+
+.status-visual-valid {
+  animation: shield-pop 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  color: var(--emerald-primary);
+  filter: drop-shadow(0 0 16px var(--emerald-glow));
+}
+
+/* 2. TAMPERED: Alarm Shake + Red Alert Flash */
+@keyframes shake-tampered {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); }
+  20%, 40%, 60%, 80% { transform: translateX(4px); }
+}
+
+@keyframes pulse-red {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 20px 4px rgba(239, 68, 68, 0.6);
+  }
+}
+
+.status-visual-tampered {
+  animation: shake-tampered 0.65s cubic-bezier(0.36, 0.07, 0.19, 0.97) both, pulse-red 2s infinite;
+  color: var(--red-primary);
+}
+
+/* 3. EXPIRED: Clock Pulsing */
+@keyframes clock-spin-pulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.06);
+    opacity: 1;
+  }
+}
+
+.status-visual-expired {
+  animation: clock-spin-pulse 2.2s ease-in-out infinite;
+  color: var(--amber-primary);
+}
+
+/* Pulse Glow & Radar Sweeps */
+@keyframes radar-pulse {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  70% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
+}
+
+.pulse-radar-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: inherit;
+  border: 2px solid currentColor;
+  animation: radar-pulse 2s cubic-bezier(0.24, 0, 0.38, 1) infinite;
+  pointer-events: none;
+}
+
+/* Shimmer Loader Gradient */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface) 0%,
+    var(--bg-surface-elevated) 50%,
+    var(--bg-surface) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite ease-in-out;
+}
+
+/* Fade In Up Entrance */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Spin Slow */
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 20s linear infinite;
+}

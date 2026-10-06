@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Key, RefreshCw, AlertOctagon, ShieldCheck, CheckCircle2,
   AlertTriangle, X, Award, Clock, RotateCcw, History
@@ -244,7 +244,7 @@ export default function KeyStatus({ onNavigate }) {
 
       {onNavigate && (
         <div className="glass-card" style={{ marginTop: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}>
-          <span className="text-muted text-xs">Issuer Workflow: Issuer Status -> Key Status -> Issue Credential</span>
+          <span className="text-muted text-xs">Issuer Workflow: Issuer Status → Key Status → Issue Credential</span>
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button className="action-btn secondary text-xs" onClick={() => onNavigate("issuer_status")}>Back to Issuer Status</button>
             <button className="action-btn primary text-xs" onClick={() => onNavigate("issue_credential")}>Proceed to Issue Credential</button>

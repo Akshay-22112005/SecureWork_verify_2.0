@@ -13,11 +13,13 @@ import {
   ShieldCheck,
   Building,
   Menu,
-  X
+  X,
+  Globe
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import StatusBadge from './StatusBadge';
+import ThemeToggle from './ThemeToggle';
 
 export default function Navbar({ onNavigate, activePage, onToggleMobileMenu, mobileMenuOpen }) {
   const { user, role, logout, login } = useAuth();
@@ -98,6 +100,19 @@ export default function Navbar({ onNavigate, activePage, onToggleMobileMenu, mob
             </button>
           ))}
         </div>
+
+        {/* Public Landing / Verification Portal Shortcut */}
+        <button 
+          className="btn btn-ghost btn-xs"
+          onClick={() => onNavigate('landing')}
+          title="Go to Public Landing Page"
+        >
+          <Globe size={14} />
+          <span>Public Portal</span>
+        </button>
+
+        {/* Dark/Light Theme Toggle */}
+        <ThemeToggle size="sm" />
 
         {/* In-App Notification Bell */}
         <button 

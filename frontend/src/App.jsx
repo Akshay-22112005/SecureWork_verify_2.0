@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Shield } from 'lucide-react';
+import { ThemeProvider } from './context/ThemeContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
 
@@ -7,9 +8,12 @@ import Navbar from './components/Navbar';
 import Sidebar from './components/Sidebar';
 import NotificationDrawer from './components/NotificationDrawer';
 
-// Pages
+// Public & Auth Pages
+import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Register from './pages/Register';
+
+// Dashboard & Core Operations Pages
 import UserDashboard from './pages/UserDashboard';
 import UploadDocument from './pages/UploadDocument';
 import VerifyDocument from './pages/VerifyDocument';
@@ -32,7 +36,15 @@ import AuditChainValidation from './pages/AuditChainValidation';
 
 function MainApp() {
   const { user, loading } = useAuth();
-  const [activePage, setActivePage] = useState('dashboard');
+  // Default to landing page if not authenticated, otherwise dashboard
+  const [activePage, setActivePage] = useState(() => {
+    try {
+      const savedToken = localStorage.getItem('securework_token');
+      return savedToken ? 'dashboard' : 'landing';
+    } catch {
+      return 'landing';
+    }
+  });
   const [pageParams, setPageParams] = useState({});
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -40,6 +52,7 @@ function MainApp() {
     setActivePage(pageId);
     setPageParams(params);
     setMobileMenuOpen(false);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   function handleToggleMobileMenu() {
@@ -74,7 +87,12 @@ function MainApp() {
     );
   }
 
-  // Auth pages if requested
+  // 1. Standalone Landing Page (shown before login or when explicitly navigated)
+  if (activePage === 'landing' || (!user && (activePage === 'dashboard' || !activePage))) {
+    return <LandingPage onNavigate={handleNavigate} />;
+  }
+
+  // 2. Standalone Auth Pages
   if (activePage === 'login') {
     return <Login onNavigate={handleNavigate} />;
   }
@@ -121,7 +139,7 @@ function MainApp() {
       case 'audit_logs':
         return <AuditLogs onNavigate={handleNavigate} />;
       case 'verification_evidence':
-        return <VerificationEvidence onNavigate={handleNavigate} />;
+        return <VerificationEvidence initialParams={pageParams} onNavigate={handleNavigate} />;
       case 'chain_validation':
         return <AuditChainValidation onNavigate={handleNavigate} />;
       default:
@@ -144,7 +162,7 @@ function MainApp() {
           mobileOpen={mobileMenuOpen}
           onCloseMobile={handleCloseMobileMenu}
         />
-        <main className="main-content-area">
+        <main className="main-content-area" id="main-content">
           {renderPage()}
         </main>
       </div>
@@ -155,10 +173,12 @@ function MainApp() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <NotificationProvider>
-        <MainApp />
-      </NotificationProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <NotificationProvider>
+          <MainApp />
+        </NotificationProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

@@ -1,0 +1,148 @@
+/* ==========================================================================
+   SecureWork Verify — Base CSS & Accessibility Layer
+   ========================================================================== */
+
+/* Universal Box Sizing */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  transition: background-color var(--transition-normal), color var(--transition-normal);
+}
+
+/* Ambient Digital Trust Grid & Glowing Mesh Background */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 0;
+  background-image: 
+    radial-gradient(ellipse 65% 45% at 75% -5%, var(--accent-indigo-glow), transparent 60%),
+    radial-gradient(ellipse 55% 40% at 15% 15%, var(--accent-cyan-glow), transparent 55%),
+    radial-gradient(ellipse 45% 35% at 50% 100%, var(--emerald-glow), transparent 60%);
+  opacity: 0.85;
+}
+
+/* Typography Hierarchy */
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-primary);
+  letter-spacing: -0.025em;
+}
+
+h1 {
+  font-size: clamp(2rem, 3.5vw + 1rem, 3.25rem);
+  letter-spacing: -0.035em;
+  font-weight: 800;
+}
+
+h2 {
+  font-size: clamp(1.5rem, 2.2vw + 0.8rem, 2.25rem);
+  letter-spacing: -0.03em;
+  font-weight: 750;
+}
+
+h3 {
+  font-size: clamp(1.2rem, 1.5vw + 0.6rem, 1.5rem);
+  letter-spacing: -0.02em;
+  font-weight: 650;
+}
+
+h4 { font-size: 1.125rem; font-weight: 600; }
+h5 { font-size: 1rem; font-weight: 600; }
+h6 { font-size: 0.875rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+
+p {
+  color: var(--text-secondary);
+  line-height: 1.65;
+}
+
+a {
+  color: var(--accent-indigo);
+  text-decoration: none;
+  transition: color var(--transition-fast);
+}
+
+a:hover {
+  color: var(--accent-indigo-light);
+}
+
+code, kbd, samp, pre {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 7px;
+  height: 7px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-indigo);
+}
+
+/* Selection */
+::selection {
+  background: var(--accent-indigo);
+  color: #ffffff;
+}
+
+/* WCAG AA Visible Focus Rings */
+:focus-visible {
+  outline: 2px solid var(--accent-indigo);
+  outline-offset: 2px;
+}
+
+/* Accessibility Helpers */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Prefers Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

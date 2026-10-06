@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Award, ShieldCheck, AlertCircle, CheckCircle2,
   Upload, Download, FileText, Users, AlertTriangle, X, ChevronDown, ChevronUp, RefreshCw
@@ -342,7 +342,7 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
 
       {onNavigate && (
         <div className="glass-card" style={{ marginTop: "1.5rem", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "0.75rem" }}>
-          <span className="text-muted text-xs">Issuer Workflow: Key Status -> Issue Credential (Single / Bulk) -> Credential Registry</span>
+          <span className="text-muted text-xs">Issuer Workflow: Key Status → Issue Credential (Single / Bulk) → Credential Registry</span>
           <div style={{ display: "flex", gap: "0.75rem" }}>
             <button className="action-btn secondary text-xs" onClick={() => onNavigate("key_status")}>Back to Key Status</button>
             <button className="action-btn primary text-xs" onClick={() => onNavigate("credential_list")}>Credential Registry</button>
