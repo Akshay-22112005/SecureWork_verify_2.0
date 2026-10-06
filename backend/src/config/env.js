@@ -92,6 +92,11 @@ function validateEnv(envSource = process.env) {
 
   const OCR_ENGINE = envSource.OCR_ENGINE || 'local';
   const AI_ENGINE = envSource.AI_ENGINE || 'local';
+  const STORAGE_DRIVER = (envSource.STORAGE_DRIVER || 'local').toLowerCase();
+  const CLOUDINARY_CLOUD_NAME = envSource.CLOUDINARY_CLOUD_NAME || '';
+  const CLOUDINARY_API_KEY = envSource.CLOUDINARY_API_KEY || '';
+  const CLOUDINARY_API_SECRET = envSource.CLOUDINARY_API_SECRET || '';
+  const CLOUDINARY_FOLDER = envSource.CLOUDINARY_FOLDER || 'securework-verify';
 
   if (errors.length > 0) {
     const errorMsg = `Environment Configuration Validation Failed:\n  - ${errors.join('\n  - ')}`;
@@ -113,6 +118,11 @@ function validateEnv(envSource = process.env) {
     AI_ENABLED: aiVal,
     OCR_ENGINE,
     AI_ENGINE,
+    STORAGE_DRIVER,
+    CLOUDINARY_CLOUD_NAME,
+    CLOUDINARY_API_KEY,
+    CLOUDINARY_API_SECRET,
+    CLOUDINARY_FOLDER,
     IS_PRODUCTION: NODE_ENV === 'production',
     IS_TEST: NODE_ENV === 'test',
     IS_DEVELOPMENT: NODE_ENV === 'development'

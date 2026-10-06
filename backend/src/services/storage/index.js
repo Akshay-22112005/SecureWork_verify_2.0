@@ -1,14 +1,21 @@
 const LocalStorageAdapter = require('./localStorage.adapter');
+const CloudinaryAdapter = require('./cloudinary.adapter');
+const env = require('../../config/env');
 
-// Singleton instance of active storage adapter
-const defaultStorageAdapter = new LocalStorageAdapter();
+let activeStorageAdapter;
+if (env.STORAGE_DRIVER === 'cloudinary') {
+  activeStorageAdapter = new CloudinaryAdapter();
+} else {
+  activeStorageAdapter = new LocalStorageAdapter();
+}
 
 function getStorageAdapter() {
-  return defaultStorageAdapter;
+  return activeStorageAdapter;
 }
 
 module.exports = {
-  storageAdapter: defaultStorageAdapter,
+  storageAdapter: activeStorageAdapter,
   getStorageAdapter,
-  LocalStorageAdapter
+  LocalStorageAdapter,
+  CloudinaryAdapter
 };

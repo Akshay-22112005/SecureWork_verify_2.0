@@ -1,36 +1,9 @@
-/**
- * Storage Adapter Interface
- * Enables zero-cost local filesystem storage in development
- * and swappable MinIO/S3 object storage in production.
- */
-
-class StorageAdapter {
-  async save(key, data, options = {}) {
-    throw new Error('Method not implemented');
-  }
-
-  async get(key) {
-    throw new Error('Method not implemented');
-  }
-
-  async delete(key) {
-    throw new Error('Method not implemented');
-  }
-
-  async exists(key) {
-    throw new Error('Method not implemented');
-  }
-}
-
-class LocalStorageAdapter extends StorageAdapter {
-  constructor(basePath) {
-    super();
-    this.basePath = basePath;
-  }
-  // Detailed implementation planned for Phase 2
-}
+const StorageAdapter = require('../services/storage/storage.adapter');
+const LocalStorageAdapter = require('../services/storage/localStorage.adapter');
+const CloudinaryAdapter = require('../services/storage/cloudinary.adapter');
 
 module.exports = {
   StorageAdapter,
-  LocalStorageAdapter
+  LocalStorageAdapter,
+  CloudinaryAdapter
 };

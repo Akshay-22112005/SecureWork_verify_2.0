@@ -85,6 +85,30 @@ async function getCredentialTimeline(req, res, next) {
   }
 }
 
+/**
+ * Bulk issue credentials via CSV row data (POST /api/credentials/bulk-issue).
+ */
+async function bulkIssue(req, res, next) {
+  try {
+    const result = await credentialService.bulkIssue(req.body, req.user);
+    return successResponse(res, result, 201);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/**
+ * Simulate deliberate tampering for live demo (POST /api/credentials/:id/simulate-tamper).
+ */
+async function simulateTamper(req, res, next) {
+  try {
+    const result = await credentialService.simulateTamper(req.params.id, req.body.tamperType, req.user);
+    return successResponse(res, result, 200);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   issueCredential,
   listCredentials,
@@ -92,5 +116,7 @@ module.exports = {
   getCredentialVersions,
   createCredentialVersion,
   revokeCredential,
-  getCredentialTimeline
+  getCredentialTimeline,
+  bulkIssue,
+  simulateTamper
 };

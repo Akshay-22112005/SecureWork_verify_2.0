@@ -110,45 +110,59 @@ SecureWork-Verify/
 
 ## Quick Start
 
-### 1. Clone & Install Dependencies
+### 1. Install Dependencies
 ```bash
-# From the repository root:
 npm install
 ```
-This automatically installs dependencies across the root, `backend/`, and `frontend/` workspaces.
 
-### 2. Environment Configuration
-Create the local environment files from the provided examples:
+### 2. Zero-Setup Database & Environment
+Copy the `.env.example` templates:
 ```bash
-# Backend environment
 cp backend/.env.example backend/.env
-
-# Frontend environment
 cp frontend/.env.example frontend/.env
 ```
+> **Zero-Setup MongoDB**: The app runs out-of-the-box with **zero setup**. If `MONGODB_URI` contains placeholder credentials (or local MongoDB daemon is offline), the system automatically spins up `mongodb-memory-server` in-memory.
+> To connect to your MongoDB Atlas cluster later, replace `MONGODB_URI` in `backend/.env` with your real Atlas connection string — a simple one-line change!
 
-### 3. Run Development Servers
+### 3. Seed Demo Data & Credentials
+Run the database seeder to create sample organizations, issuers, users, cryptographic keys, sample credentials (valid, expired, revoked, tampered), and audit chain:
 ```bash
-# Run both Backend (Port 5000) and Frontend (Port 5173) concurrently:
+npm run seed
+```
+
+#### Demo Logins
+| Role | Email | Password |
+|---|---|---|
+| **System Admin** | `admin@securework.local` | `AdminSecurePass123!` |
+| **Auditor** | `auditor@securework.local` | `AdminSecurePass123!` |
+| **Stanford Issuer** | `issuer@stanford.edu` | `SecureUserPass123!` |
+| **MIT Issuer** | `issuer@mit.edu` | `SecureUserPass123!` |
+| **HR Verifier** | `hr_lead@enterprise.local` | `SecureUserPass123!` |
+| **Worker / Candidate 1** | `alice@example.com` | `SecureUserPass123!` |
+| **Worker / Candidate 2** | `bob@example.com` | `SecureUserPass123!` |
+| **Worker / Candidate 3** | `carol@example.com` | `SecureUserPass123!` |
+
+### 4. Run Development Servers
+```bash
+# Start backend (port 5000) and frontend (port 5173) concurrently:
 npm run dev
-
-# Or run separately:
-npm run dev:backend
-npm run dev:frontend
 ```
 
-### 4. Verify Foundation
-Run the automated foundation verification script:
-```bash
-npm run verify
-```
+---
+
+## Cloudinary & Storage Driver
+
+SecureWork Verify supports modular storage drivers selected via `STORAGE_DRIVER` in `backend/.env`:
+- `STORAGE_DRIVER=local` (Default): Uses zero-cost local SHA-256 disk storage.
+- `STORAGE_DRIVER=cloudinary`: Uses authenticated/private Cloudinary delivery with SHA-256 integrity verification.
+  - Required variables: `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET`, `CLOUDINARY_FOLDER=securework-verify`.
+  - Automatically falls back to local storage if placeholder keys are detected.
 
 ---
 
 ## Health Check API
 
-Once the backend is started, test the health check endpoint:
-
+The backend exposes a runtime health check endpoint:
 ```bash
 curl http://localhost:5000/api/health
 ```
@@ -159,14 +173,18 @@ Sample Response:
   "success": true,
   "data": {
     "status": "healthy",
-    "timestamp": "2026-08-30T10:20:00.000Z",
-    "uptime": 12.45,
-    "environment": "development",
+    "service": "SecureWork Verify Backend",
+    "version": "0.1.0",
     "database": {
-      "status": "disconnected",
-      "host": "localhost"
+      "status": "connected",
+      "isConnected": true,
+      "host": "127.0.0.1"
     },
-    "version": "0.1.0"
+    "storageDriver": "local",
+    "ocr": { "status": "on", "engine": "local" },
+    "auditChain": {
+      "headHash": "f1f8ec2a080693a2fba290c83f27a92b616a179eb702e5f25b140409de68bc0f"
+    }
   }
 }
 ```

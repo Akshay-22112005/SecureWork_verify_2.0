@@ -28,7 +28,9 @@ backend/storage/temp/*
 dist/
 dist-ssr/
 build/
+frontend/dist/
 *.tsbuildinfo
+*.zip
 
 # Logs
 logs/

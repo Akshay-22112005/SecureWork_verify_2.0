@@ -548,6 +548,169 @@ class CredentialService {
 
     return timeline;
   }
+
+  /**
+   * Bulk issue credentials from structured CSV row items.
+   * @param {object} params
+   * @param {string} params.issuerId
+   * @param {Array<object>} params.rows
+   * @param {object} actorUser
+   * @returns {Promise<object>} Batch issuance summary
+   */
+  async bulkIssue({ issuerId, rows = [] }, actorUser) {
+    if (!rows || !Array.isArray(rows) || rows.length === 0) {
+      throw new ValidationError('At least one row is required for bulk issuance');
+    }
+
+    const User = require('../models/user.model');
+    const Document = require('../models/document.model');
+    const storageService = require('./storage.service');
+
+    const results = [];
+    let succeeded = 0;
+    let failed = 0;
+
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
+      try {
+        const email = (row.recipientEmail || row.email || '').trim().toLowerCase();
+        const name = (row.recipientName || row.name || 'Recipient').trim();
+        const title = (row.title || '').trim();
+        const credentialType = (row.credentialType || 'CERTIFICATION').toUpperCase();
+        const expiresAt = row.expiresAt ? new Date(row.expiresAt) : null;
+
+        if (!email || !title) {
+          throw new ValidationError('recipientEmail and title are required');
+        }
+
+        // 1. Find or create user
+        let recipientUser = await User.findOne({ email });
+        if (!recipientUser) {
+          const defaultPass = 'SecureUserPass123!';
+          const hash = await User.hashPassword(defaultPass);
+          recipientUser = await User.create({
+            email,
+            name,
+            passwordHash: hash,
+            role: 'USER',
+            status: 'ACTIVE'
+          });
+        }
+
+        // 2. Generate a valid document payload
+        const dummyPdf = Buffer.from(`%PDF-1.4\nSECUREWORK_VERIFY_BULK_DOC_${title}_${recipientUser.userId}_${Date.now()}`);
+        const uploadResult = await storageService.uploadFile(
+          dummyPdf,
+          `bulk_${title.toLowerCase().replace(/[^a-z0-9]/g, '_')}.pdf`,
+          'application/pdf'
+        );
+
+        const doc = await Document.create({
+          originalFilename: `bulk_${title}.pdf`,
+          mimeType: 'application/pdf',
+          fileSize: uploadResult.fileSize,
+          storagePath: uploadResult.storagePath,
+          sha256Hash: uploadResult.sha256Hash,
+          hashAlgorithm: 'SHA-256',
+          uploadedBy: recipientUser.userId,
+          representationType: 'ORIGINAL_DIGITAL_FILE'
+        });
+
+        // 3. Issue credential
+        const issued = await this.issueCredential(
+          {
+            issuerId,
+            recipientId: recipientUser.userId,
+            documentId: doc.documentId,
+            credentialType,
+            title,
+            expiresAt
+          },
+          actorUser
+        );
+
+        succeeded++;
+        results.push({
+          row: i + 1,
+          status: 'SUCCESS',
+          recipientEmail: email,
+          recipientName: name,
+          title,
+          credentialId: issued.credential.credentialId
+        });
+      } catch (rowErr) {
+        failed++;
+        results.push({
+          row: i + 1,
+          status: 'FAILED',
+          recipientEmail: row.recipientEmail || row.email || 'N/A',
+          title: row.title || 'N/A',
+          error: rowErr.message
+        });
+      }
+    }
+
+    return {
+      total: rows.length,
+      succeeded,
+      failed,
+      results
+    };
+  }
+
+  /**
+   * Simulate a deliberate tampering on a credential for live security demonstration.
+   * @param {string} credentialId
+   * @param {string} tamperType - 'SIGNATURE' | 'DOCUMENT' | 'STATUS'
+   * @param {object} actorUser
+   */
+  async simulateTamper(credentialId, tamperType = 'SIGNATURE', actorUser) {
+    const credential = await Credential.findOne({ credentialId });
+    if (!credential) {
+      throw new NotFoundError('Credential not found');
+    }
+
+    const fs = require('fs');
+    const crypto = require('crypto');
+    let detail = '';
+
+    if (tamperType === 'SIGNATURE') {
+      const corruptedSig = 'TAMPERED_MALICIOUS_SIG_' + crypto.randomBytes(32).toString('hex');
+      credential.signature = corruptedSig;
+      await credential.save();
+      detail = 'Digital signature byte array was corrupted';
+    } else if (tamperType === 'DOCUMENT') {
+      const doc = await require('../models/document.model').findOne({ documentId: credential.documentId });
+      if (doc && fs.existsSync(doc.storagePath)) {
+        fs.appendFileSync(doc.storagePath, '\n[MALICIOUS_TAMPER_INJECTED_BYTES]');
+        detail = '1 extra unauthorized byte was appended to the underlying disk file';
+      } else {
+        credential.documentHash = sha256('TAMPERED_PAYLOAD_' + Date.now());
+        await credential.save();
+        detail = 'Document hash was modified in database record';
+      }
+    } else {
+      credential.title = `${credential.title} [MODIFIED_UNAUTHORIZED]`;
+      await credential.save();
+      detail = 'Credential title payload was altered without resigning';
+    }
+
+    await auditService.recordEvent(
+      actorUser?.userId || 'SYSTEM',
+      actorUser?.role || 'ADMIN',
+      'TAMPER_TEST_SIMULATED',
+      credentialId,
+      { tamperType, detail }
+    );
+
+    return {
+      credentialId,
+      tamperType,
+      detail,
+      message: 'Tampering simulated successfully. Verification will now fail mathematically.'
+    };
+  }
 }
 
 module.exports = new CredentialService();
+

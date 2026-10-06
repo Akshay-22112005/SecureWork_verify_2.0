@@ -56,6 +56,11 @@ const bodyLimit = `${env.MAX_FILE_SIZE_MB}mb`;
 app.use(express.json({ limit: bodyLimit }));
 app.use(express.urlencoded({ extended: true, limit: bodyLimit }));
 
+const { setupSwaggerDocs } = require('./docs/swagger');
+
+// Mount Swagger UI Documentation at /api/docs
+setupSwaggerDocs(app);
+
 // Mount API Routes
 app.use('/api', routes);
 

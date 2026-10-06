@@ -18,6 +18,8 @@ const AIAnalysis = require('./aiAnalysis.model');
 const AuditLog = require('./auditLog.model');
 const AuditCheckpoint = require('./auditCheckpoint.model');
 const Notification = require('./notification.model');
+const ApiKey = require('./apiKey.model');
+const Webhook = require('./webhook.model');
 const baseModelPlugin = require('./plugins/baseModel.plugin');
 
 // Architecture registry detailing domain models and implementation schedule
@@ -131,6 +133,8 @@ module.exports = {
   AuditLog,
   AuditCheckpoint,
   Notification,
+  ApiKey,
+  Webhook,
 
   // Architecture registry & conventions
   MODEL_REGISTRY,

@@ -10,6 +10,12 @@ router.use(authenticateUser);
 // Issue new credential (Version 1)
 router.post('/issue', credentialController.issueCredential);
 
+// Bulk issue credentials via CSV
+router.post('/bulk-issue', credentialController.bulkIssue);
+
+// Simulate tampering test for live demo
+router.post('/:id/simulate-tamper', credentialController.simulateTamper);
+
 // List credentials (subject to role/user scoping)
 router.get('/', credentialController.listCredentials);
 

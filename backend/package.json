@@ -8,11 +8,13 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "seed": "node src/scripts/seed.js",
     "seed:admin": "node src/scripts/seedAdmin.js",
     "demo": "node src/scripts/demo.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.5.1",
     "cors": "^2.8.5",
     "dotenv": "^16.4.7",
     "express": "^4.21.2",
@@ -21,9 +23,14 @@
     "mongoose": "^8.9.5",
     "morgan": "^1.10.0",
     "multer": "^2.3.0",
+    "nodemailer": "^10.0.15",
+    "pdfkit": "^0.20.2",
+    "qrcode": "^1.5.4",
+    "swagger-ui-express": "^5.0.1",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
+    "mongodb-memory-server": "^10.1.3",
     "nodemon": "^3.1.9"
   },
   "engines": {

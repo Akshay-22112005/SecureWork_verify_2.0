@@ -4,9 +4,9 @@
  * automatic 401 session expiration handling, and JSON/multipart handling.
  */
 
-// Normalize base API URL from environment
+// Normalize base API URL from environment (supports VITE_API_URL or VITE_API_BASE_URL or dev proxy /api)
 function resolveApiBaseUrl() {
-  const envBase = (import.meta.env.VITE_API_BASE_URL || '/api').trim().replace(/\/+$/, '');
+  const envBase = (import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '/api').trim().replace(/\/+$/, '');
   // If base is only a host e.g. "http://localhost:5000", append "/api"
   if (/^https?:\/\/[^/]+$/.test(envBase)) {
     return `${envBase}/api`;

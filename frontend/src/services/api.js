@@ -134,6 +134,16 @@ export const api = {
     listCheckpoints: () => apiClient('/audit-logs/checkpoints')
   },
 
+  // Public Verification (No Login Required)
+  public: {
+    verify: (id) => apiClient(`/public/verify/${id}`, { skipAuth: true }),
+    getPdfUrl: (id) => `${API_BASE}/public/pdf/${id}`,
+    getBundleUrl: (id) => `${API_BASE}/public/bundle/${id}`,
+    getW3cUrl: (id) => `${API_BASE}/public/w3c/${id}`,
+    getQrUrl: (id) => `${API_BASE}/public/qr/${id}`,
+    listRevocations: () => apiClient('/public/revocations', { skipAuth: true })
+  },
+
   // In-App Notifications
   notifications: {
     list: (params = {}) => {
@@ -142,6 +152,41 @@ export const api = {
     },
     markAsRead: (id) => apiClient(`/notifications/${id}/read`, { method: 'PATCH' }),
     markAllAsRead: () => apiClient('/notifications/read-all', { method: 'PATCH' })
+  },
+
+  // API Keys (B2B Employer Integrations)
+  apiKeys: {
+    list: () => apiClient('/api-keys'),
+    create: (data) => apiClient('/api-keys', { method: 'POST', body: data }),
+    revoke: (id) => apiClient(`/api-keys/${id}`, { method: 'DELETE' })
+  },
+
+  // Webhooks
+  webhooks: {
+    list: () => apiClient('/webhooks'),
+    register: (data) => apiClient('/webhooks', { method: 'POST', body: data }),
+    delete: (id) => apiClient(`/webhooks/${id}`, { method: 'DELETE' })
+  },
+
+  // Analytics
+  analytics: {
+    getOverview: () => apiClient('/analytics/overview')
+  },
+
+  // Credentials (Enhanced with Bulk Issue & Tamper Test)
+  credentials: {
+    issue: (data) => apiClient('/credentials/issue', { method: 'POST', body: data }),
+    bulkIssue: (data) => apiClient('/credentials/bulk-issue', { method: 'POST', body: data }),
+    simulateTamper: (id, tamperType) => apiClient(`/credentials/${id}/simulate-tamper`, { method: 'POST', body: { tamperType } }),
+    list: (params = {}) => {
+      const q = new URLSearchParams(params).toString();
+      return apiClient(`/credentials${q ? `?${q}` : ''}`);
+    },
+    getById: (id) => apiClient(`/credentials/${id}`),
+    getVersions: (id) => apiClient(`/credentials/${id}/versions`),
+    getTimeline: (id) => apiClient(`/credentials/${id}/timeline`),
+    createVersion: (id, data) => apiClient(`/credentials/${id}/versions`, { method: 'POST', body: data }),
+    revoke: (id, reason) => apiClient(`/credentials/${id}/revoke`, { method: 'PATCH', body: { reason } })
   }
 };
 
