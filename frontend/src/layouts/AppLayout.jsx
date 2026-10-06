@@ -4,6 +4,7 @@ import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
 import NotificationDrawer from '../components/NotificationDrawer';
 import FloatingBackground from '../components/FloatingBackground';
+import PageTransition from '../components/PageTransition';
 
 export default function AppLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -75,7 +76,9 @@ export default function AppLayout() {
           onCloseMobile={handleCloseMobileMenu}
         />
         <main className="main-content-area" id="main-content">
-          <Outlet context={{ onNavigate: handleNavigate }} />
+          <PageTransition key={location.pathname}>
+            <Outlet context={{ onNavigate: handleNavigate }} />
+          </PageTransition>
         </main>
       </div>
       <NotificationDrawer />
