@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { animate } from 'animejs';
 import { useReducedMotion } from '../hooks/useReducedMotion';
+import { useTheme } from '../context/ThemeContext';
 
 // Inline SVGs for trust symbols
 function ShieldShape({ size = 28 }) {
@@ -50,35 +51,49 @@ function QrGlyphShape({ size = 26 }) {
   );
 }
 
-// Pre-defined geometric configurations (18 rich shapes)
+// 24 Shapes categorized across 3 layered depths
 const SHAPES_CONFIG = [
-  { id: 1, type: 'circle', color: 'var(--accent-indigo)', size: 48, top: '12%', left: '8%', blur: 2, opacity: 0.22, dx: 35, dy: -40, dur: 9000, delay: 0 },
-  { id: 2, type: 'shield', color: 'var(--emerald-primary)', size: 38, top: '22%', left: '82%', blur: 1, opacity: 0.28, dx: -45, dy: 30, dur: 11000, delay: 500 },
-  { id: 3, type: 'rounded-square', color: 'var(--accent-cyan)', size: 42, top: '65%', left: '14%', blur: 2, opacity: 0.2, dx: 30, dy: 45, dur: 10000, delay: 1000 },
-  { id: 4, type: 'ring', color: 'var(--accent-indigo)', size: 54, top: '78%', left: '76%', blur: 1, opacity: 0.24, dx: -35, dy: -35, dur: 12000, delay: 1500 },
-  { id: 5, type: 'key', color: 'var(--accent-cyan)', size: 32, top: '15%', left: '45%', blur: 1, opacity: 0.26, dx: 25, dy: -25, dur: 9500, delay: 800 },
-  { id: 6, type: 'qr', color: 'var(--accent-indigo)', size: 36, top: '48%', left: '90%', blur: 1, opacity: 0.22, dx: -40, dy: 20, dur: 13000, delay: 1200 },
-  { id: 7, type: 'lock', color: 'var(--amber-primary)', size: 30, top: '85%', left: '38%', blur: 1, opacity: 0.24, dx: -20, dy: -40, dur: 10500, delay: 300 },
-  { id: 8, type: 'circle', color: 'var(--emerald-primary)', size: 28, top: '40%', left: '6%', blur: 1, opacity: 0.25, dx: 40, dy: 30, dur: 8500, delay: 600 },
-  { id: 9, type: 'rounded-square', color: 'var(--accent-indigo)', size: 34, top: '32%', left: '68%', blur: 2, opacity: 0.18, dx: -30, dy: -30, dur: 11500, delay: 1400 },
-  { id: 10, type: 'ring', color: 'var(--accent-cyan)', size: 38, top: '8%', left: '92%', blur: 1, opacity: 0.25, dx: -25, dy: 35, dur: 9800, delay: 900 },
-  { id: 11, type: 'shield', color: 'var(--accent-indigo)', size: 32, top: '58%', left: '52%', blur: 1, opacity: 0.18, dx: 20, dy: 25, dur: 12500, delay: 400 },
-  { id: 12, type: 'circle', color: 'var(--amber-primary)', size: 22, top: '72%', left: '94%', blur: 1, opacity: 0.26, dx: -30, dy: -20, dur: 8800, delay: 1100 },
-  { id: 13, type: 'qr', color: 'var(--emerald-primary)', size: 28, top: '88%', left: '18%', blur: 1, opacity: 0.2, dx: 35, dy: -25, dur: 10200, delay: 700 },
-  { id: 14, type: 'ring', color: 'var(--accent-indigo)', size: 64, top: '35%', left: '26%', blur: 3, opacity: 0.15, dx: -25, dy: 30, dur: 14000, delay: 200 },
-  { id: 15, type: 'rounded-square', color: 'var(--accent-cyan)', size: 26, top: '4%', left: '28%', blur: 1, opacity: 0.22, dx: 20, dy: 20, dur: 9200, delay: 1300 },
-  { id: 16, type: 'lock', color: 'var(--accent-indigo)', size: 24, top: '92%', left: '62%', blur: 1, opacity: 0.24, dx: 15, dy: -30, dur: 11800, delay: 500 },
-  { id: 17, type: 'circle', color: 'var(--emerald-primary)', size: 40, top: '50%', left: '4%', blur: 2, opacity: 0.16, dx: 30, dy: -35, dur: 13500, delay: 1600 },
-  { id: 18, type: 'key', color: 'var(--accent-indigo)', size: 28, top: '2%', left: '70%', blur: 1, opacity: 0.25, dx: -35, dy: 20, dur: 10800, delay: 100 }
+  // Layer 1: Deep ambient glowing light orbs
+  { id: 1, layer: 1, type: 'orb', color: 'var(--accent-indigo)', size: 320, top: '-5%', left: '70%', blur: 60, opacity: 0.14, dx: 45, dy: 35, dur: 18000, delay: 0 },
+  { id: 2, layer: 1, type: 'orb', color: 'var(--accent-cyan)', size: 280, top: '45%', left: '-8%', blur: 55, opacity: 0.12, dx: -35, dy: 50, dur: 20000, delay: 1000 },
+  { id: 3, layer: 1, type: 'orb', color: 'var(--emerald-primary)', size: 260, top: '75%', left: '60%', blur: 50, opacity: 0.11, dx: 40, dy: -40, dur: 22000, delay: 2000 },
+
+  // Layer 2: Midground geometric icons & outlines
+  { id: 4, layer: 2, type: 'shield', color: 'var(--emerald-primary)', size: 36, top: '18%', left: '84%', blur: 0, opacity: 0.24, dx: -35, dy: 25, dur: 11000, delay: 300 },
+  { id: 5, layer: 2, type: 'key', color: 'var(--accent-cyan)', size: 30, top: '14%', left: '42%', blur: 0, opacity: 0.22, dx: 25, dy: -30, dur: 10000, delay: 800 },
+  { id: 6, layer: 2, type: 'lock', color: 'var(--amber-primary)', size: 28, top: '82%', left: '32%', blur: 0, opacity: 0.22, dx: -20, dy: -35, dur: 12000, delay: 500 },
+  { id: 7, layer: 2, type: 'qr', color: 'var(--accent-indigo)', size: 34, top: '44%', left: '92%', blur: 0, opacity: 0.2, dx: -30, dy: 30, dur: 13000, delay: 1200 },
+  { id: 8, layer: 2, type: 'shield', color: 'var(--accent-indigo)', size: 32, top: '62%', left: '48%', blur: 0, opacity: 0.18, dx: 25, dy: 20, dur: 11500, delay: 700 },
+  { id: 9, layer: 2, type: 'key', color: 'var(--accent-indigo)', size: 28, top: '3%', left: '65%', blur: 0, opacity: 0.22, dx: -30, dy: 20, dur: 9800, delay: 200 },
+  { id: 10, layer: 2, type: 'lock', color: 'var(--emerald-primary)', size: 26, top: '90%', left: '64%', blur: 0, opacity: 0.2, dx: 20, dy: -25, dur: 12500, delay: 900 },
+  { id: 11, layer: 2, type: 'qr', color: 'var(--emerald-primary)', size: 30, top: '86%', left: '16%', blur: 0, opacity: 0.18, dx: 30, dy: -20, dur: 10500, delay: 600 },
+
+  // Layer 3: Foreground crisp shapes, rings, and rounded nodes
+  { id: 12, layer: 3, type: 'circle', color: 'var(--accent-indigo)', size: 44, top: '10%', left: '8%', blur: 1, opacity: 0.2, dx: 30, dy: -35, dur: 8500, delay: 0 },
+  { id: 13, layer: 3, type: 'rounded-square', color: 'var(--accent-cyan)', size: 38, top: '60%', left: '12%', blur: 1, opacity: 0.18, dx: 25, dy: 40, dur: 9500, delay: 1100 },
+  { id: 14, layer: 3, type: 'ring', color: 'var(--accent-indigo)', size: 52, top: '74%', left: '78%', blur: 1, opacity: 0.22, dx: -30, dy: -30, dur: 11000, delay: 1400 },
+  { id: 15, layer: 3, type: 'circle', color: 'var(--emerald-primary)', size: 26, top: '38%', left: '5%', blur: 0, opacity: 0.24, dx: 35, dy: 25, dur: 8200, delay: 400 },
+  { id: 16, layer: 3, type: 'rounded-square', color: 'var(--accent-indigo)', size: 32, top: '30%', left: '72%', blur: 1, opacity: 0.16, dx: -25, dy: -25, dur: 10800, delay: 1300 },
+  { id: 17, layer: 3, type: 'ring', color: 'var(--accent-cyan)', size: 36, top: '7%', left: '94%', blur: 0, opacity: 0.24, dx: -20, dy: 30, dur: 9200, delay: 800 },
+  { id: 18, layer: 3, type: 'circle', color: 'var(--amber-primary)', size: 20, top: '70%', left: '95%', blur: 0, opacity: 0.24, dx: -25, dy: -15, dur: 8600, delay: 1000 },
+  { id: 19, layer: 3, type: 'ring', color: 'var(--accent-indigo)', size: 60, top: '32%', left: '24%', blur: 2, opacity: 0.14, dx: -20, dy: 25, dur: 13500, delay: 300 },
+  { id: 20, layer: 3, type: 'rounded-square', color: 'var(--accent-cyan)', size: 24, top: '5%', left: '26%', blur: 0, opacity: 0.2, dx: 15, dy: 15, dur: 8800, delay: 1200 },
+  { id: 21, layer: 3, type: 'circle', color: 'var(--emerald-primary)', size: 36, top: '48%', left: '3%', blur: 1, opacity: 0.15, dx: 25, dy: -30, dur: 12800, delay: 1500 },
+  { id: 22, layer: 3, type: 'ring', color: 'var(--accent-cyan)', size: 42, top: '22%', left: '56%', blur: 0, opacity: 0.18, dx: -20, dy: 20, dur: 10200, delay: 700 },
+  { id: 23, layer: 3, type: 'rounded-square', color: 'var(--accent-indigo)', size: 28, top: '80%', left: '48%', blur: 1, opacity: 0.16, dx: 20, dy: -20, dur: 11200, delay: 900 },
+  { id: 24, layer: 3, type: 'circle', color: 'var(--accent-cyan)', size: 22, top: '92%', left: '88%', blur: 0, opacity: 0.22, dx: -15, dy: -25, dur: 8900, delay: 400 }
 ];
 
 export default function FloatingBackground() {
   const containerRef = useRef(null);
+  const layer1Ref = useRef(null);
+  const layer2Ref = useRef(null);
+  const layer3Ref = useRef(null);
   const animInstancesRef = useRef([]);
   const prefersReducedMotion = useReducedMotion();
+  const { isDark } = useTheme();
   const [isMobile, setIsMobile] = useState(false);
 
-  // Check viewport width for performance optimization (fewer shapes on mobile)
   useEffect(() => {
     function checkMobile() {
       setIsMobile(window.innerWidth < 768);
@@ -88,14 +103,13 @@ export default function FloatingBackground() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
-  // Animate shapes with animejs v4 looping paths
+  // Multi-layered animation with animejs v4
   useEffect(() => {
     if (prefersReducedMotion || !containerRef.current) return;
 
     const shapes = containerRef.current.querySelectorAll('.floating-shape-item');
     if (!shapes || shapes.length === 0) return;
 
-    // Clear any previous animations
     animInstancesRef.current.forEach((a) => {
       if (a && typeof a.cancel === 'function') a.cancel();
     });
@@ -109,7 +123,8 @@ export default function FloatingBackground() {
         const anim = animate(shape, {
           translateX: [0, cfg.dx],
           translateY: [0, cfg.dy],
-          rotate: [0, (index % 2 === 0 ? 1 : -1) * (15 + (index % 4) * 8)],
+          rotate: [0, (index % 2 === 0 ? 1 : -1) * (12 + (index % 4) * 6)],
+          scale: cfg.type === 'orb' ? [1, 1.08] : [1, 1.05],
           duration: cfg.dur,
           delay: cfg.delay,
           loop: true,
@@ -118,20 +133,17 @@ export default function FloatingBackground() {
         });
         animInstancesRef.current.push(anim);
       } catch (err) {
-        // Fallback gracefully
+        // Fallback
       }
     });
 
-    // Pause animations when tab is hidden for performance
+    // Pause when document is hidden
     function handleVisibility() {
       const isHidden = document.visibilityState === 'hidden';
       animInstancesRef.current.forEach((anim) => {
         if (anim) {
-          if (isHidden && typeof anim.pause === 'function') {
-            anim.pause();
-          } else if (!isHidden && typeof anim.play === 'function') {
-            anim.play();
-          }
+          if (isHidden && typeof anim.pause === 'function') anim.pause();
+          else if (!isHidden && typeof anim.play === 'function') anim.play();
         }
       });
     }
@@ -147,7 +159,7 @@ export default function FloatingBackground() {
     };
   }, [prefersReducedMotion, isMobile]);
 
-  // Subtle throttled mouse parallax on desktop
+  // Multi-layer mouse parallax
   useEffect(() => {
     if (prefersReducedMotion || isMobile) return;
 
@@ -155,10 +167,18 @@ export default function FloatingBackground() {
     function handleMouseMove(e) {
       if (!ticking) {
         requestAnimationFrame(() => {
-          if (!containerRef.current) return;
-          const x = (e.clientX / window.innerWidth - 0.5) * 24;
-          const y = (e.clientY / window.innerHeight - 0.5) * 24;
-          containerRef.current.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+          const normX = e.clientX / window.innerWidth - 0.5;
+          const normY = e.clientY / window.innerHeight - 0.5;
+
+          if (layer1Ref.current) {
+            layer1Ref.current.style.transform = `translate3d(${normX * 12}px, ${normY * 12}px, 0)`;
+          }
+          if (layer2Ref.current) {
+            layer2Ref.current.style.transform = `translate3d(${normX * 22}px, ${normY * 22}px, 0)`;
+          }
+          if (layer3Ref.current) {
+            layer3Ref.current.style.transform = `translate3d(${normX * 34}px, ${normY * 34}px, 0)`;
+          }
           ticking = false;
         });
         ticking = true;
@@ -169,8 +189,9 @@ export default function FloatingBackground() {
     return () => window.removeEventListener('mousemove', handleMouseMove);
   }, [prefersReducedMotion, isMobile]);
 
-  // Render fewer shapes on mobile (8 shapes) for smooth 60fps
-  const activeShapes = isMobile ? SHAPES_CONFIG.slice(0, 8) : SHAPES_CONFIG;
+  // Mobile optimization: 10 shapes on mobile, 24 on desktop
+  const activeShapes = isMobile ? SHAPES_CONFIG.slice(0, 10) : SHAPES_CONFIG;
+  const opacityMultiplier = isDark ? 1 : 0.55;
 
   return (
     <div 
@@ -187,29 +208,43 @@ export default function FloatingBackground() {
         overflow: 'hidden'
       }}
     >
-      {/* Faint subtle ambient grid overlay */}
+      {/* Subtle digital trust grid */}
       <div 
-        className="floating-bg-grid"
         style={{
           position: 'absolute',
           inset: 0,
-          backgroundImage: `radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px)`,
+          backgroundImage: `radial-gradient(rgba(255, 255, 255, ${isDark ? '0.04' : '0.08'}) 1px, transparent 1px)`,
           backgroundSize: '32px 32px',
-          opacity: 0.6
+          opacity: 0.7
         }}
       />
 
-      {/* Floating Shapes Canvas */}
-      <div 
-        ref={containerRef}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          transition: 'transform 120ms cubic-bezier(0.1, 0.9, 0.2, 1)'
-        }}
-      >
-        {activeShapes.map((shape) => {
-          return (
+      <div ref={containerRef} style={{ position: 'absolute', inset: 0 }}>
+        {/* Layer 1: Deep Orbs */}
+        <div ref={layer1Ref} style={{ position: 'absolute', inset: 0, transition: 'transform 180ms ease-out' }}>
+          {activeShapes.filter(s => s.layer === 1).map((shape) => (
+            <div
+              key={shape.id}
+              className="floating-shape-item"
+              style={{
+                position: 'absolute',
+                top: shape.top,
+                left: shape.left,
+                width: shape.size,
+                height: shape.size,
+                borderRadius: '50%',
+                background: `radial-gradient(circle, ${shape.color} 0%, transparent 70%)`,
+                opacity: shape.opacity * opacityMultiplier,
+                filter: `blur(${shape.blur}px)`,
+                willChange: 'transform'
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Layer 2: Midground Trust Symbols */}
+        <div ref={layer2Ref} style={{ position: 'absolute', inset: 0, transition: 'transform 140ms ease-out' }}>
+          {activeShapes.filter(s => s.layer === 2).map((shape) => (
             <div
               key={shape.id}
               className="floating-shape-item"
@@ -218,8 +253,32 @@ export default function FloatingBackground() {
                 top: shape.top,
                 left: shape.left,
                 color: shape.color,
-                opacity: shape.opacity,
-                filter: `blur(${shape.blur}px)`,
+                opacity: shape.opacity * opacityMultiplier,
+                filter: shape.blur ? `blur(${shape.blur}px)` : 'none',
+                willChange: 'transform'
+              }}
+            >
+              {shape.type === 'shield' && <ShieldShape size={shape.size} />}
+              {shape.type === 'key' && <KeyShape size={shape.size} />}
+              {shape.type === 'lock' && <LockShape size={shape.size} />}
+              {shape.type === 'qr' && <QrGlyphShape size={shape.size} />}
+            </div>
+          ))}
+        </div>
+
+        {/* Layer 3: Foreground Crisp Shapes & Rings */}
+        <div ref={layer3Ref} style={{ position: 'absolute', inset: 0, transition: 'transform 100ms ease-out' }}>
+          {activeShapes.filter(s => s.layer === 3).map((shape) => (
+            <div
+              key={shape.id}
+              className="floating-shape-item"
+              style={{
+                position: 'absolute',
+                top: shape.top,
+                left: shape.left,
+                color: shape.color,
+                opacity: shape.opacity * opacityMultiplier,
+                filter: shape.blur ? `blur(${shape.blur}px)` : 'none',
                 willChange: 'transform'
               }}
             >
@@ -239,7 +298,7 @@ export default function FloatingBackground() {
                   style={{
                     width: shape.size,
                     height: shape.size,
-                    borderRadius: '12px',
+                    borderRadius: '10px',
                     background: `linear-gradient(135deg, ${shape.color}, transparent)`,
                     border: `1px solid ${shape.color}`
                   }}
@@ -255,13 +314,9 @@ export default function FloatingBackground() {
                   }}
                 />
               )}
-              {shape.type === 'shield' && <ShieldShape size={shape.size} />}
-              {shape.type === 'key' && <KeyShape size={shape.size} />}
-              {shape.type === 'lock' && <LockShape size={shape.size} />}
-              {shape.type === 'qr' && <QrGlyphShape size={shape.size} />}
             </div>
-          );
-        })}
+          ))}
+        </div>
       </div>
     </div>
   );
