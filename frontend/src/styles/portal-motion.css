@@ -1,0 +1,291 @@
+/* ==========================================================================
+   SecureWork Verify — Portal Motion Layer
+   New visual motion styles for the public landing page.
+   Complements animations.css and landing.css without duplication.
+   ========================================================================== */
+
+/* ── SCROLL-REVEAL BASE STATES ─────────────────────────────────────────── */
+/* Elements start hidden; JS adds .is-visible after IntersectionObserver fires */
+.reveal-fade {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-fade.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.reveal-left {
+  opacity: 0;
+  transform: translateX(-32px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-left.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.reveal-right {
+  opacity: 0;
+  transform: translateX(32px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-right.is-visible {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Stagger delay helpers — attach to children inside a .reveal-stagger container */
+.reveal-stagger > *:nth-child(1) { transition-delay: 0ms; }
+.reveal-stagger > *:nth-child(2) { transition-delay: 80ms; }
+.reveal-stagger > *:nth-child(3) { transition-delay: 160ms; }
+.reveal-stagger > *:nth-child(4) { transition-delay: 240ms; }
+.reveal-stagger > *:nth-child(5) { transition-delay: 320ms; }
+.reveal-stagger > *:nth-child(6) { transition-delay: 400ms; }
+.reveal-stagger > *:nth-child(7) { transition-delay: 480ms; }
+.reveal-stagger > *:nth-child(8) { transition-delay: 560ms; }
+
+/* ── HERO WORD-REVEAL ──────────────────────────────────────────────────── */
+.hero-word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.hero-word.word-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── GRADIENT TEXT SHIMMER ─────────────────────────────────────────────── */
+@keyframes gradient-sweep {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.gradient-text-shimmer {
+  background: linear-gradient(
+    120deg,
+    var(--accent-indigo) 0%,
+    var(--accent-cyan) 35%,
+    var(--emerald-primary) 65%,
+    var(--accent-indigo) 100%
+  );
+  background-size: 250% 250%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: gradient-sweep 5s ease infinite;
+}
+
+/* ── NAVBAR SCROLL STATE ───────────────────────────────────────────────── */
+.landing-navbar.navbar-scrolled {
+  padding-top: 0;
+  padding-bottom: 0;
+  box-shadow: 0 2px 24px rgba(0, 0, 0, 0.14);
+  background: var(--glass-bg);
+}
+
+.landing-navbar.navbar-scrolled .landing-nav-container {
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+
+/* ── MAGNETIC BUTTON GLOW ──────────────────────────────────────────────── */
+.btn-magnetic {
+  position: relative;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.2s ease;
+  will-change: transform;
+}
+
+.btn-magnetic:hover {
+  box-shadow: 0 0 24px 4px var(--accent-indigo-glow),
+              0 8px 32px rgba(0, 0, 0, 0.18);
+}
+
+.btn-magnetic.btn-outline:hover {
+  box-shadow: 0 0 20px 3px rgba(20, 184, 166, 0.25),
+              0 6px 24px rgba(0, 0, 0, 0.12);
+}
+
+/* ── CARD TILT WITH LIGHT FOLLOW ───────────────────────────────────────── */
+.tilt-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  will-change: transform;
+  transform-style: preserve-3d;
+}
+
+.tilt-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+    rgba(255, 255, 255, 0.06) 0%,
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.tilt-card:hover::before {
+  opacity: 1;
+}
+
+/* ── VERIFICATION PULSE RINGS ──────────────────────────────────────────── */
+@keyframes pulse-expand {
+  0% {
+    transform: translate(-50%, -50%) scale(0.3);
+    opacity: 0.7;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(4);
+    opacity: 0;
+  }
+}
+
+.verify-pulse-ring {
+  position: fixed;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 1.5px solid var(--accent-cyan);
+  pointer-events: none;
+  z-index: 0;
+  transform: translate(-50%, -50%) scale(0.3);
+  animation: pulse-expand 2.2s cubic-bezier(0.2, 0, 0.4, 1) forwards;
+}
+
+/* ── FLOATING CARD GLOW (Hero credential card) ─────────────────────────── */
+@keyframes card-float {
+  0%, 100% { transform: translateY(0px) rotate(-1deg); }
+  50%       { transform: translateY(-10px) rotate(1deg); }
+}
+
+.holo-credential-card {
+  animation: card-float 6s ease-in-out infinite;
+}
+
+/* ── STATS COUNT-UP ROW ────────────────────────────────────────────────── */
+.stat-item {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.stat-item:hover {
+  transform: translateY(-4px);
+}
+
+/* ── SMOOTH MARQUEE STRIP ──────────────────────────────────────────────── */
+@keyframes marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee-scroll 28s linear infinite;
+  gap: 3rem;
+}
+
+.marquee-track:hover,
+.marquee-wrapper:hover .marquee-track {
+  animation-play-state: paused;
+}
+
+.marquee-wrapper {
+  overflow: hidden;
+  width: 100%;
+  mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 10%, black 90%, transparent 100%);
+}
+
+/* ── SECTION STAGGER WRAPPERS ───────────────────────────────────────────── */
+.how-steps-grid .how-step-card,
+.feature-grid .feature-card,
+.security-principles-grid .security-card {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Card hover lift */
+.feature-card,
+.how-step-card,
+.security-card {
+  transition: transform 0.25s cubic-bezier(0.34, 1.2, 0.64, 1),
+              box-shadow 0.25s ease !important;
+}
+
+.feature-card:hover,
+.how-step-card:hover,
+.security-card:hover {
+  transform: translateY(-6px) !important;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.14) !important;
+}
+
+/* ── SCROLL PARALLAX LAYER HINTS ────────────────────────────────────────── */
+.portal-parallax-slow {
+  will-change: transform;
+}
+
+.portal-parallax-mid {
+  will-change: transform;
+}
+
+/* ── PREFERS-REDUCED-MOTION OVERRIDES ───────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .reveal-fade,
+  .reveal-left,
+  .reveal-right {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .hero-word {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .gradient-text-shimmer {
+    animation: none;
+    background-position: 0% 50%;
+  }
+
+  .marquee-track {
+    animation: none;
+  }
+
+  .tilt-card {
+    transition: none;
+  }
+
+  .holo-credential-card {
+    animation: none;
+  }
+
+  .stat-item:hover {
+    transform: none;
+  }
+
+  .feature-card:hover,
+  .how-step-card:hover,
+  .security-card:hover {
+    transform: none !important;
+  }
+}

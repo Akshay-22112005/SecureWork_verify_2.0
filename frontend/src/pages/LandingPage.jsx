@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Shield, 
   ShieldCheck, 
@@ -28,9 +28,21 @@ import ThemeToggle from '../components/ThemeToggle';
 import PublicVerifyBox from '../components/PublicVerifyBox';
 import HeroVisualAnimation from '../components/HeroVisualAnimation';
 import FaqAccordion from '../components/FaqAccordion';
+import FloatingBackground from '../components/FloatingBackground';
+import { useScrollReveal } from '../hooks/useScrollReveal';
+import { useTiltCards } from '../hooks/useTiltCards';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 export default function LandingPage({ onNavigate }) {
   const { isAuthenticated } = useAuth();
+  const prefersReducedMotion = useReducedMotion();
+  const navbarRef = useRef(null);
+  const pulseContainerRef = useRef(null);
+  const heroTitleRef = useRef(null);
+  const [navScrolled, setNavScrolled] = useState(false);
+  const [pulseRings, setPulseRings] = useState([]);
+  const pulseIdRef = useRef(0);
+
   const [statsCount, setStatsCount] = useState({
     verified: 99.98,
     speed: 12,
@@ -49,6 +61,56 @@ export default function LandingPage({ onNavigate }) {
     return () => clearInterval(timer);
   }, []);
 
+  // ── Navbar scroll shrink/glass ────────────────────────────────────────
+  useEffect(() => {
+    function onScroll() {
+      setNavScrolled(window.scrollY > 40);
+    }
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  // ── Hero word-by-word reveal ──────────────────────────────────────────
+  useEffect(() => {
+    if (prefersReducedMotion || !heroTitleRef.current) return;
+    const words = heroTitleRef.current.querySelectorAll('.hero-word');
+    words.forEach((w, i) => {
+      setTimeout(() => w.classList.add('word-visible'), 120 + i * 75);
+    });
+  }, [prefersReducedMotion]);
+
+  // ── Verification pulse rings (random, occasional) ─────────────────────
+  useEffect(() => {
+    if (prefersReducedMotion) return;
+    const spawnPulse = () => {
+      const id = pulseIdRef.current++;
+      const x = 10 + Math.random() * 80; // % from left
+      const y = 10 + Math.random() * 80; // % from top
+      setPulseRings((prev) => [...prev.slice(-4), { id, x, y }]);
+      setTimeout(() => {
+        setPulseRings((prev) => prev.filter((r) => r.id !== id));
+      }, 2400);
+    };
+    const interval = setInterval(spawnPulse, 3800);
+    return () => clearInterval(interval);
+  }, [prefersReducedMotion]);
+
+  // ── Scroll-reveal hook (attaches to page root) ────────────────────────
+  const revealRef = useScrollReveal({
+    selector: '.reveal-fade, .reveal-left, .reveal-right',
+    threshold: 0.1,
+    rootMargin: '0px 0px -30px 0px',
+  });
+
+  // ── Card tilt hook ────────────────────────────────────────────────────
+  const tiltRef = useTiltCards('.tilt-card');
+
+  // Single combined ref for the root div
+  const rootRef = useCallback((node) => {
+    revealRef.current = node;
+    tiltRef.current = node;
+  }, []);
+
   function scrollToSection(id) {
     const el = document.getElementById(id);
     if (el) {
@@ -57,9 +119,21 @@ export default function LandingPage({ onNavigate }) {
   }
 
   return (
-    <div className="landing-page-root">
+    <div className="landing-page-root" ref={rootRef}>
+      {/* ═══ FLOATING BACKGROUND (fixed, z-index -1) ═══ */}
+      <FloatingBackground />
+
+      {/* ═══ VERIFICATION PULSE RINGS ═══ */}
+      {pulseRings.map((ring) => (
+        <div
+          key={ring.id}
+          className="verify-pulse-ring"
+          style={{ left: `${ring.x}vw`, top: `${ring.y}vh` }}
+          aria-hidden="true"
+        />
+      ))}
       {/* ═══ 1. STICKY GLASS NAVBAR ═══ */}
-      <header className="landing-navbar">
+      <header ref={navbarRef} className={`landing-navbar${navScrolled ? ' navbar-scrolled' : ''}`}>
         <div className="landing-nav-container">
           <div className="landing-nav-logo" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
             <div className="logo-icon">
@@ -114,7 +188,7 @@ export default function LandingPage({ onNavigate }) {
       </header>
 
       {/* ═══ 2. HERO SECTION ═══ */}
-      <section className="landing-hero" aria-labelledby="hero-heading">
+      <section className="landing-hero reveal-fade" aria-labelledby="hero-heading">
         <div className="landing-hero-grid">
           {/* Left Column: Headlines, Copy & Public Verification Box */}
           <div className="hero-content-col">
@@ -123,8 +197,19 @@ export default function LandingPage({ onNavigate }) {
               <span>Zero-Trust Asymmetric Cryptography</span>
             </div>
 
-            <h1 id="hero-heading" className="hero-title animate-fade-in-up">
-              Cryptographically <span className="gradient-text-indigo-cyan">Verifiable Credentials</span> With Zero Blockchain.
+            <h1 id="hero-heading" className="hero-title" ref={heroTitleRef}>
+              {/* Each word gets .hero-word for staggered word-reveal */}
+              {'Cryptographically '.split(' ').map((w, i) => (
+                <span key={i} className="hero-word">{w}{' '}</span>
+              ))}
+              <span className="gradient-text-shimmer">
+                {'Verifiable Credentials'.split(' ').map((w, i) => (
+                  <span key={i} className="hero-word">{w}{' '}</span>
+                ))}
+              </span>
+              {'With Zero Blockchain.'.split(' ').map((w, i) => (
+                <span key={i} className="hero-word">{w}{' '}</span>
+              ))}
             </h1>
 
             <p className="hero-subtitle animate-fade-in-up">
@@ -134,7 +219,7 @@ export default function LandingPage({ onNavigate }) {
             <div className="hero-cta-group animate-fade-in-up">
               <button 
                 type="button" 
-                className="btn btn-primary btn-lg"
+                className="btn btn-primary btn-lg btn-magnetic"
                 onClick={() => scrollToSection('hero-verify')}
               >
                 <Search size={18} />
@@ -142,7 +227,7 @@ export default function LandingPage({ onNavigate }) {
               </button>
               <button 
                 type="button" 
-                className="btn btn-outline btn-lg"
+                className="btn btn-outline btn-lg btn-magnetic"
                 onClick={() => onNavigate(isAuthenticated ? 'dashboard' : 'register')}
               >
                 <span>Get Started Free</span>
@@ -202,8 +287,8 @@ export default function LandingPage({ onNavigate }) {
           </p>
         </div>
 
-        <div className="how-steps-grid">
-          <div className="how-step-card">
+        <div className="how-steps-grid reveal-stagger">
+          <div className="how-step-card tilt-card reveal-fade">
             <div className="how-step-number">01</div>
             <h3 className="how-step-title">Canonical Issue</h3>
             <p className="how-step-desc">
@@ -211,7 +296,7 @@ export default function LandingPage({ onNavigate }) {
             </p>
           </div>
 
-          <div className="how-step-card">
+          <div className="how-step-card tilt-card reveal-fade">
             <div className="how-step-number">02</div>
             <h3 className="how-step-title">Asymmetric Sign</h3>
             <p className="how-step-desc">
@@ -219,7 +304,7 @@ export default function LandingPage({ onNavigate }) {
             </p>
           </div>
 
-          <div className="how-step-card">
+          <div className="how-step-card tilt-card reveal-fade">
             <div className="how-step-number">03</div>
             <h3 className="how-step-title">Share via QR</h3>
             <p className="how-step-desc">
@@ -227,7 +312,7 @@ export default function LandingPage({ onNavigate }) {
             </p>
           </div>
 
-          <div className="how-step-card">
+          <div className="how-step-card tilt-card reveal-fade">
             <div className="how-step-number">04</div>
             <h3 className="how-step-title">Instant Verify</h3>
             <p className="how-step-desc">
@@ -238,7 +323,7 @@ export default function LandingPage({ onNavigate }) {
       </section>
 
       {/* ═══ 5. FEATURE GRID ═══ */}
-      <section id="features" className="landing-section" style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-subtle)', borderBottom: '1px solid var(--border-subtle)' }}>
+      <section id="features" className="landing-section reveal-fade" style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-subtle)', borderBottom: '1px solid var(--border-subtle)' }}>
         <div className="section-header">
           <div className="section-badge">
             <Sparkles size={14} />
@@ -250,8 +335,8 @@ export default function LandingPage({ onNavigate }) {
           </p>
         </div>
 
-        <div className="feature-grid">
-          <div className="feature-card">
+        <div className="feature-grid reveal-stagger">
+          <div className="feature-card tilt-card reveal-fade">
             <div className="feature-icon-box">
               <Terminal size={26} />
             </div>
@@ -261,7 +346,7 @@ export default function LandingPage({ onNavigate }) {
             </p>
           </div>
 
-          <div className="feature-card">
+          <div className="feature-card tilt-card reveal-fade">
             <div className="feature-icon-box">
               <Layers size={26} />
             </div>
@@ -271,7 +356,7 @@ export default function LandingPage({ onNavigate }) {
             </p>
           </div>
 
-          <div className="feature-card">
+          <div className="feature-card tilt-card reveal-fade">
             <div className="feature-icon-box">
               <Zap size={26} />
             </div>
@@ -281,7 +366,7 @@ export default function LandingPage({ onNavigate }) {
             </p>
           </div>
 
-          <div className="feature-card">
+          <div className="feature-card tilt-card reveal-fade">
             <div className="feature-icon-box">
               <FileCheck size={26} />
             </div>
@@ -291,7 +376,7 @@ export default function LandingPage({ onNavigate }) {
             </p>
           </div>
 
-          <div className="feature-card">
+          <div className="feature-card tilt-card reveal-fade">
             <div className="feature-icon-box">
               <Users size={26} />
             </div>
@@ -301,7 +386,7 @@ export default function LandingPage({ onNavigate }) {
             </p>
           </div>
 
-          <div className="feature-card">
+          <div className="feature-card tilt-card reveal-fade">
             <div className="feature-icon-box">
               <Database size={26} />
             </div>
@@ -314,7 +399,7 @@ export default function LandingPage({ onNavigate }) {
       </section>
 
       {/* ═══ 6. SECURITY PRINCIPLES SECTION ═══ */}
-      <section id="security-principles" className="landing-section">
+      <section id="security-principles" className="landing-section reveal-fade">
         <div className="section-header">
           <div className="section-badge">
             <Lock size={14} />
@@ -326,8 +411,8 @@ export default function LandingPage({ onNavigate }) {
           </p>
         </div>
 
-        <div className="security-principles-grid">
-          <div className="security-card">
+        <div className="security-principles-grid reveal-stagger">
+          <div className="security-card tilt-card reveal-fade">
             <div className="security-card-header">
               <ShieldCheck size={20} className="text-emerald" />
               <span>Evidence First</span>
@@ -337,7 +422,7 @@ export default function LandingPage({ onNavigate }) {
             </p>
           </div>
 
-          <div className="security-card">
+          <div className="security-card tilt-card reveal-fade">
             <div className="security-card-header">
               <Key size={20} className="text-cyan" />
               <span>Isolated Private Key Vaults</span>
@@ -347,7 +432,7 @@ export default function LandingPage({ onNavigate }) {
             </p>
           </div>
 
-          <div className="security-card">
+          <div className="security-card tilt-card reveal-fade">
             <div className="security-card-header">
               <Cpu size={20} className="text-indigo" />
               <span>RFC 8785 Canonicalization</span>
@@ -357,7 +442,7 @@ export default function LandingPage({ onNavigate }) {
             </p>
           </div>
 
-          <div className="security-card">
+          <div className="security-card tilt-card reveal-fade">
             <div className="security-card-header">
               <Award size={20} className="text-amber" />
               <span>NIST Key Lifecycle Management</span>
@@ -370,7 +455,7 @@ export default function LandingPage({ onNavigate }) {
       </section>
 
       {/* ═══ 7. FAQ ACCORDION ═══ */}
-      <section id="faq" className="landing-section" style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-subtle)' }}>
+      <section id="faq" className="landing-section reveal-fade" style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-subtle)' }}>
         <div className="section-header">
           <div className="section-badge">
             <FileText size={14} />
