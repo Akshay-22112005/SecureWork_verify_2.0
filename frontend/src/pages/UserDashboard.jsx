@@ -23,6 +23,8 @@ import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 import SimplePricingPreview from '../components/SimplePricingPreview';
+import AnalyticsSection from '../components/AnalyticsSection';
+import ApiKeysWebhooksSection from '../components/ApiKeysWebhooksSection';
 
 const PERSONA_CONFIGS = {
   USER: {
@@ -763,6 +765,16 @@ export default function UserDashboard({ onNavigate }) {
           </table>
         )}
       </div>
+
+      {/* Analytics Overview — ADMIN & ISSUER */}
+      {(role === 'ADMIN' || role === 'ISSUER') && (
+        <AnalyticsSection onNavigate={onNavigate} />
+      )}
+
+      {/* API Keys & Webhooks — ADMIN only */}
+      {role === 'ADMIN' && (
+        <ApiKeysWebhooksSection />
+      )}
 
       {/* Platform Features, Trusted Partners & Simple Pricing Preview */}
       <SimplePricingPreview onNavigate={onNavigate} />
