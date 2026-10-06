@@ -25,6 +25,7 @@ import StatusBadge from '../components/StatusBadge';
 import SimplePricingPreview from '../components/SimplePricingPreview';
 import AnalyticsSection from '../components/AnalyticsSection';
 import ApiKeysWebhooksSection from '../components/ApiKeysWebhooksSection';
+import SvgVerifiedShield from '../components/SvgVerifiedShield';
 
 const PERSONA_CONFIGS = {
   USER: {
@@ -317,7 +318,7 @@ export default function UserDashboard({ onNavigate }) {
             <div className="metric-card-top">
               <span className="metric-label">Identity Status</span>
               <div className="metric-icon bg-green-subtle">
-                <CheckCircle2 size={18} className="text-success" />
+                <SvgVerifiedShield size={20} />
               </div>
             </div>
             <div className="metric-card-bottom">
