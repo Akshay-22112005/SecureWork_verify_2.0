@@ -3,6 +3,7 @@ const app = require('./app');
 const env = require('./config/env');
 const { connectDB, disconnectDB } = require('./config/db');
 const logger = require('./utils/logger');
+// Server entrypoint
 
 /**
  * Ensures required storage and keys directories exist.

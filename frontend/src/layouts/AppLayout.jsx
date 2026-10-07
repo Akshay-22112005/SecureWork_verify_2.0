@@ -3,7 +3,7 @@ import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Sidebar from '../components/Sidebar';
 import NotificationDrawer from '../components/NotificationDrawer';
-import FloatingBackground from '../components/FloatingBackground';
+import AnimatedBackground from '../components/AnimatedBackground';
 import PageTransition from '../components/PageTransition';
 
 export default function AppLayout() {
@@ -60,9 +60,9 @@ export default function AppLayout() {
   }
 
   return (
-    <div className="app-layout">
-      {/* Floating Animated Geometric Trust Background */}
-      <FloatingBackground />
+    <div className="persona-theme app-layout">
+      {/* CodeHelp-inspired Animated Dark Hero Trust Background */}
+      <AnimatedBackground />
 
       <Navbar 
         onNavigate={handleNavigate} 

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Shield, Lock, Mail, User, AlertCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import AnimatedBackground from '../components/AnimatedBackground';
 
 export default function Register({ onNavigate }) {
   const { register } = useAuth();
@@ -38,8 +39,10 @@ export default function Register({ onNavigate }) {
   }
 
   return (
-    <div className="auth-container">
-      <div className="glass-card auth-card">
+    <div className="persona-theme auth-wrapper-page">
+      <AnimatedBackground />
+      <div className="auth-container">
+        <div className="glass-card auth-card">
         <div className="auth-header">
           <div className="logo-badge" style={{ margin: '0 auto 1rem auto' }}>
             <Shield size={28} />
@@ -128,5 +131,6 @@ export default function Register({ onNavigate }) {
         </div>
       </div>
     </div>
+  </div>
   );
 }

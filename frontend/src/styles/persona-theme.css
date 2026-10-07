@@ -1,0 +1,426 @@
+/* ==========================================================================
+   SecureWork Verify — Persona Theme & Animated Dark Hero Styles
+   Inspired by CodeHelp.in (Near-black background, purple glow, concentric arcs, 
+   floating glass icon tiles, drifting particles, rising dashboard cards)
+   ========================================================================== */
+
+/* ─── 1. ANIMATED BACKGROUND LAYER (CodeHelp Style) ─── */
+.animated-hero-bg-root {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  pointer-events: none;
+  overflow: hidden;
+  background-color: #09090d;
+  transition: background-color 0.4s ease;
+}
+
+.animated-hero-bg-root.light-mode {
+  background-color: #f8fafc;
+}
+
+/* Deep Ambient Glowing Orbs */
+.bg-glow-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.glow-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(90px);
+  will-change: transform, opacity;
+  pointer-events: none;
+}
+
+/* Primary Violet/Purple Glow behind center/top heading */
+.glow-orb.primary-glow {
+  width: 650px;
+  height: 650px;
+  top: -8%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(circle, rgba(124, 92, 255, 0.85) 0%, rgba(168, 85, 247, 0.45) 50%, transparent 75%);
+  animation: orb-pulse-drift 10s ease-in-out infinite alternate;
+}
+
+/* Secondary Indigo Glow (Right side) */
+.glow-orb.secondary-glow {
+  width: 500px;
+  height: 500px;
+  top: 35%;
+  right: -5%;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.7) 0%, rgba(124, 92, 255, 0.35) 50%, transparent 70%);
+  animation: orb-sway-right 12s ease-in-out infinite alternate;
+}
+
+/* Accent Sky/Cyan Glow (Left side) */
+.glow-orb.accent-glow {
+  width: 420px;
+  height: 420px;
+  bottom: 10%;
+  left: -5%;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.55) 0%, rgba(99, 102, 241, 0.25) 50%, transparent 70%);
+  animation: orb-sway-left 14s ease-in-out infinite alternate;
+}
+
+@keyframes orb-pulse-drift {
+  0% {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  50% {
+    transform: translateX(-48%) translateY(30px) scale(1.12);
+  }
+  100% {
+    transform: translateX(-52%) translateY(-15px) scale(0.95);
+  }
+}
+
+@keyframes orb-sway-right {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(-35px, -45px) scale(1.15);
+  }
+}
+
+@keyframes orb-sway-left {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  100% {
+    transform: translate(40px, -30px) scale(1.1);
+  }
+}
+
+/* Concentric Arcs / Orbit Rings */
+.concentric-arcs-container {
+  position: absolute;
+  top: -150px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1100px;
+  height: 1100px;
+  pointer-events: none;
+  opacity: 0.85;
+}
+
+.arcs-svg {
+  width: 100%;
+  height: 100%;
+}
+
+.animate-arcs-spin {
+  animation: arcs-spin 60s linear infinite;
+  transform-origin: 500px 380px;
+}
+
+@keyframes arcs-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Particles Canvas */
+.particles-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* Floating Glass Icon Tiles */
+.floating-tiles-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.floating-glass-tile {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37), inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  animation: tile-drift-float ease-in-out infinite alternate;
+  will-change: transform;
+  transition: border-color 0.3s ease;
+}
+
+.light-mode .floating-glass-tile {
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  box-shadow: 0 8px 24px 0 rgba(15, 23, 42, 0.08);
+}
+
+.tile-glow-indicator {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  opacity: 0.6;
+}
+
+@keyframes tile-drift-float {
+  0% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  100% {
+    transform: translate3d(var(--dx, 12px), var(--dy, -16px), 0) rotate(var(--rot, 6deg));
+  }
+}
+
+/* Micro-Grid Overlay */
+.bg-micro-grid {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+  opacity: 0.8;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 35%, black 40%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 35%, black 40%, transparent 100%);
+}
+
+.light-mode .bg-micro-grid {
+  background-image: radial-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px);
+}
+
+/* ─── 2. PERSONA THEME SCOPED CONTAINER & GLASSMORPHISM ─── */
+.persona-theme {
+  --p-bg: #09090d;
+  --p-glow-1: #7c5cff;
+  --p-glow-2: #a855f7;
+  --p-glow-cyan: #38bdf8;
+  --p-glass-bg: rgba(16, 16, 26, 0.62);
+  --p-glass-card: rgba(18, 18, 30, 0.68);
+  --p-glass-card-hover: rgba(25, 25, 42, 0.82);
+  --p-border-glass: rgba(255, 255, 255, 0.085);
+  --p-border-glass-hover: rgba(168, 85, 247, 0.45);
+  --p-text-primary: #f8fafc;
+  --p-text-muted: #94a3b8;
+  
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  color: var(--p-text-primary);
+  background-color: transparent;
+}
+
+[data-theme="light"] .persona-theme {
+  --p-bg: #f8fafc;
+  --p-glass-bg: rgba(255, 255, 255, 0.78);
+  --p-glass-card: rgba(255, 255, 255, 0.85);
+  --p-glass-card-hover: #ffffff;
+  --p-border-glass: rgba(226, 232, 240, 0.9);
+  --p-border-glass-hover: rgba(124, 92, 255, 0.4);
+  --p-text-primary: #0f172a;
+  --p-text-muted: #64748b;
+}
+
+/* Content layer sitting above animated background */
+.persona-theme .app-layout,
+.persona-theme .app-body,
+.persona-theme .main-content-area,
+.persona-theme .auth-container {
+  position: relative;
+  z-index: 1;
+  background: transparent !important;
+}
+
+/* Translucent Top Navbar */
+.persona-theme .top-nav {
+  background: var(--p-glass-bg) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-bottom: 1px solid var(--p-border-glass) !important;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.35);
+}
+
+/* Translucent Sidebar */
+.persona-theme .app-sidebar {
+  background: var(--p-glass-bg) !important;
+  backdrop-filter: blur(20px) !important;
+  -webkit-backdrop-filter: blur(20px) !important;
+  border-right: 1px solid var(--p-border-glass) !important;
+}
+
+/* Glassmorphism Cards & Panels */
+.persona-theme .glass-card,
+.persona-theme .card,
+.persona-theme .trust-card,
+.persona-theme .metric-card,
+.persona-theme .stat-card,
+.persona-theme .role-portal-card,
+.persona-theme .action-card,
+.persona-theme .auth-card {
+  background: var(--p-glass-card) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+  border: 1px solid var(--p-border-glass) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+              box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), 
+              border-color 0.25s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.persona-theme .glass-card:hover,
+.persona-theme .card:hover,
+.persona-theme .trust-card:hover,
+.persona-theme .metric-card:hover,
+.persona-theme .stat-card:hover,
+.persona-theme .role-portal-card:hover,
+.persona-theme .action-card:hover {
+  border-color: var(--p-border-glass-hover) !important;
+  box-shadow: 0 16px 40px -4px rgba(0, 0, 0, 0.55), 
+              0 0 24px 0 rgba(124, 92, 255, 0.25), 
+              inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+  transform: translateY(-3px) !important;
+}
+
+/* Rising Dashboard Preview Entrance Effect */
+.persona-theme .rising-preview-section,
+.persona-theme .dashboard-hero-section,
+.persona-theme .page-content > *:first-child {
+  animation: persona-rise-up 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes persona-rise-up {
+  0% {
+    opacity: 0;
+    transform: translateY(28px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Dashboard Mockup / Preview Card Soft Gradient Mask */
+.persona-theme .dashboard-preview-mockup {
+  position: relative;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  box-shadow: 0 25px 60px -12px rgba(0, 0, 0, 0.7), 0 0 40px rgba(124, 92, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  mask-image: linear-gradient(to bottom, black 75%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to bottom, black 75%, transparent 100%);
+}
+
+/* CodeHelp Gradient Primary Buttons */
+.persona-theme .btn-primary,
+.persona-theme .action-btn.primary {
+  background: linear-gradient(135deg, #7c5cff 0%, #4f46e5 100%) !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.18) !important;
+  box-shadow: 0 4px 18px 0 rgba(124, 92, 255, 0.38) !important;
+  font-weight: 600;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.persona-theme .btn-primary:hover,
+.persona-theme .action-btn.primary:hover {
+  transform: translateY(-2px) scale(1.01) !important;
+  box-shadow: 0 8px 28px 0 rgba(124, 92, 255, 0.55), 0 0 12px 0 rgba(168, 85, 247, 0.4) !important;
+}
+
+/* Auth Cards (Login & Register pages) */
+.persona-theme .auth-card {
+  max-width: 460px;
+  width: 100%;
+  margin: 0 auto;
+  border-radius: 20px !important;
+  padding: 2.25rem !important;
+  animation: persona-rise-up 0.55s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.persona-theme .auth-header h2 {
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #ffffff;
+  letter-spacing: -0.025em;
+  margin-bottom: 0.5rem;
+}
+
+[data-theme="light"] .persona-theme .auth-header h2 {
+  color: #0f172a;
+}
+
+/* Preset test credentials buttons on login */
+.persona-theme .demo-btn {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid var(--p-border-glass) !important;
+  color: var(--p-text-muted) !important;
+  transition: all 0.2s ease !important;
+}
+
+.persona-theme .demo-btn:hover {
+  background: rgba(124, 92, 255, 0.12) !important;
+  border-color: rgba(168, 85, 247, 0.4) !important;
+  color: #ffffff !important;
+}
+
+[data-theme="light"] .persona-theme .demo-btn:hover {
+  color: #0f172a !important;
+}
+
+/* Tables in Persona theme */
+.persona-theme .table-container,
+.persona-theme .data-table {
+  background: var(--p-glass-card) !important;
+  border-radius: 16px;
+}
+
+/* ─── 3. REDUCED MOTION PREFERENCE ─── */
+@media (prefers-reduced-motion: reduce) {
+  .glow-orb,
+  .animate-arcs-spin,
+  .floating-glass-tile,
+  .rising-preview-section,
+  .dashboard-hero-section,
+  .persona-theme .auth-card,
+  .persona-theme .page-content > *:first-child {
+    animation: none !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* ─── 4. MOBILE RESPONSIVENESS ─── */
+@media (max-width: 768px) {
+  .concentric-arcs-container {
+    width: 650px;
+    height: 650px;
+    top: -80px;
+  }
+
+  .glow-orb.primary-glow {
+    width: 380px;
+    height: 380px;
+  }
+
+  .glow-orb.secondary-glow,
+  .glow-orb.accent-glow {
+    width: 250px;
+    height: 250px;
+  }
+
+  .floating-glass-tile {
+    transform: scale(0.85);
+  }
+}
