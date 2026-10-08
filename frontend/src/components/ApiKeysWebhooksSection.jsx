@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   KeySquare, Webhook, Plus, Trash2, Copy, Check,
   CheckCircle2, AlertTriangle, RefreshCw, X
@@ -17,8 +17,19 @@ function ApiKeyPane() {
 
   async function loadKeys() {
     setLoading(true);
-    try { const r = await api.apiKeys.list(); if (r?.success) setKeys(r.data.apiKeys || r.data || []); }
-    catch {} finally { setLoading(false); }
+    try {
+      const r = await api.apiKeys.list();
+      if (r?.success) {
+        const list = Array.isArray(r.data?.keys)
+          ? r.data.keys
+          : Array.isArray(r.data?.apiKeys)
+          ? r.data.apiKeys
+          : Array.isArray(r.data)
+          ? r.data
+          : [];
+        setKeys(list);
+      }
+    } catch {} finally { setLoading(false); }
   }
   useEffect(() => { loadKeys(); }, []);
 
@@ -42,6 +53,8 @@ function ApiKeyPane() {
   function copyKey(k) {
     navigator.clipboard.writeText(k); setCopied(true); setTimeout(() => setCopied(false), 2000);
   }
+
+  const safeKeys = Array.isArray(keys) ? keys : [];
 
   return (
     <div>
@@ -67,13 +80,13 @@ function ApiKeyPane() {
       )}
       {loading ? (
         <div style={{ textAlign: "center", padding: "1rem" }}><RefreshCw size={18} className="pulse-dot" style={{ opacity: 0.4 }} /></div>
-      ) : keys.length === 0 ? (
+      ) : safeKeys.length === 0 ? (
         <div className="empty-state" style={{ padding: "1.5rem" }}><KeySquare size={28} style={{ opacity: 0.2, marginBottom: "0.5rem" }} /><p>No API keys yet.</p></div>
       ) : (
         <table className="data-table">
           <thead><tr><th>Name</th><th>Key Prefix</th><th>Scopes</th><th>Created</th><th>Actions</th></tr></thead>
           <tbody>
-            {keys.map((k) => (
+            {safeKeys.map((k) => (
               <tr key={k._id || k.apiKeyId}>
                 <td><strong>{k.name}</strong></td>
                 <td className="code-snippet">{k.keyPrefix || (k.key || "").slice(0, 12) + "..."}****</td>
@@ -105,8 +118,17 @@ function WebhookPane() {
 
   async function loadHooks() {
     setLoading(true);
-    try { const r = await api.webhooks.list(); if (r?.success) setHooks(r.data.webhooks || r.data || []); }
-    catch {} finally { setLoading(false); }
+    try {
+      const r = await api.webhooks.list();
+      if (r?.success) {
+        const list = Array.isArray(r.data?.webhooks)
+          ? r.data.webhooks
+          : Array.isArray(r.data)
+          ? r.data
+          : [];
+        setHooks(list);
+      }
+    } catch {} finally { setLoading(false); }
   }
   useEffect(() => { loadHooks(); }, []);
 
@@ -126,6 +148,8 @@ function WebhookPane() {
     try { await api.webhooks.delete(id); loadHooks(); }
     catch (err) { alert(err.message); }
   }
+
+  const safeHooks = Array.isArray(hooks) ? hooks : [];
 
   return (
     <div>
@@ -149,13 +173,13 @@ function WebhookPane() {
       {error && <div className="alert-banner danger" style={{ marginBottom: "0.75rem" }}><AlertTriangle size={13} /><span>{error}</span></div>}
       {loading ? (
         <div style={{ textAlign: "center", padding: "1rem" }}><RefreshCw size={18} className="pulse-dot" style={{ opacity: 0.4 }} /></div>
-      ) : hooks.length === 0 ? (
+      ) : safeHooks.length === 0 ? (
         <div className="empty-state" style={{ padding: "1.5rem" }}><Webhook size={28} style={{ opacity: 0.2, marginBottom: "0.5rem" }} /><p>No webhooks registered yet.</p></div>
       ) : (
         <table className="data-table">
           <thead><tr><th>Endpoint URL</th><th>Events</th><th>Status</th><th>Created</th><th>Actions</th></tr></thead>
           <tbody>
-            {hooks.map((h) => (
+            {safeHooks.map((h) => (
               <tr key={h._id || h.webhookId}>
                 <td className="code-snippet" style={{ maxWidth: "260px", overflow: "hidden", textOverflow: "ellipsis" }}>{h.url}</td>
                 <td>{(h.events || []).map((ev) => <span key={ev} className="badge-tag" style={{ marginRight: "2px", fontSize: "0.65rem" }}>{ev}</span>)}</td>

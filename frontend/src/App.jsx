@@ -7,6 +7,7 @@ import { NotificationProvider } from './context/NotificationContext';
 import AppLayout from './layouts/AppLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 import RoleRoute from './components/RoleRoute';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Public & Auth Pages
 import LandingPage from './pages/LandingPage';
@@ -75,7 +76,11 @@ function PageWrapper({ Component, ...rest }) {
     }
   }
 
-  return <Component onNavigate={handleNavigate} initialParams={location.state || {}} {...rest} />;
+  return (
+    <ErrorBoundary>
+      <Component onNavigate={handleNavigate} initialParams={location.state || {}} {...rest} />
+    </ErrorBoundary>
+  );
 }
 
 export function AppRoutes() {

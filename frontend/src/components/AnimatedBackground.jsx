@@ -24,7 +24,7 @@ const DEFAULT_TILES = [
   { id: 'tile-6', icon: Terminal, label: 'Audit Proof', top: '8%', right: '22%', size: 40, color: '#a855f7', dur: '8.8s', delay: '0.4s', dx: '-10px', dy: '14px', rot: '-6deg' },
   { id: 'tile-7', icon: Lock, label: 'Zero-Knowledge', top: '78%', right: '20%', size: 42, color: '#38bdf8', dur: '9.2s', delay: '2.5s', dx: '15px', dy: '-12px', rot: '4deg' },
   { id: 'tile-8', icon: Code, label: 'Decentralized', top: '35%', right: '3%', size: 40, color: '#7c5cff', dur: '10.5s', delay: '1.8s', dx: '-16px', dy: '18px', rot: '-7deg' },
-  { id: 'tile-9', icon: CheckCircle2, label: 'Consensus', top: '6%;', left: '26%', size: 38, color: '#34d399', dur: '8.2s', delay: '0.8s', dx: '10px', dy: '-12px', rot: '5deg' }
+  { id: 'tile-9', icon: CheckCircle2, label: 'Consensus', top: '6%', left: '26%', size: 38, color: '#34d399', dur: '8.2s', delay: '0.8s', dx: '10px', dy: '-12px', rot: '5deg' }
 ];
 
 export default function AnimatedBackground({

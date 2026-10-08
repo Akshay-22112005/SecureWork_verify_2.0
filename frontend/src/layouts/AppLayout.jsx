@@ -5,6 +5,7 @@ import Sidebar from '../components/Sidebar';
 import NotificationDrawer from '../components/NotificationDrawer';
 import AnimatedBackground from '../components/AnimatedBackground';
 import PageTransition from '../components/PageTransition';
+import ErrorBoundary from '../components/ErrorBoundary';
 
 export default function AppLayout() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -76,9 +77,11 @@ export default function AppLayout() {
           onCloseMobile={handleCloseMobileMenu}
         />
         <main className="main-content-area" id="main-content">
-          <PageTransition key={location.pathname}>
-            <Outlet context={{ onNavigate: handleNavigate }} />
-          </PageTransition>
+          <ErrorBoundary>
+            <PageTransition key={location.pathname}>
+              <Outlet context={{ onNavigate: handleNavigate }} />
+            </PageTransition>
+          </ErrorBoundary>
         </main>
       </div>
       <NotificationDrawer />
