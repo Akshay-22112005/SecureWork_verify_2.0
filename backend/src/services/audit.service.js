@@ -331,8 +331,40 @@ class AuditService {
       AuditLog.countDocuments(filter)
     ]);
 
+    const userIds = [...new Set(logs.map(l => l.performedBy).filter(id => typeof id === 'string' && id.startsWith('usr_')))];
+    let userRoleMap = new Map();
+    if (userIds.length > 0) {
+      try {
+        const User = require('../models/user.model');
+        const users = await User.find({ userId: { $in: userIds } }, { userId: 1, role: 1 });
+        userRoleMap = new Map(users.map(u => [u.userId, u.role]));
+      } catch {}
+    }
+
+    const enrichedLogs = logs.map(l => {
+      const logObj = l.toJSON();
+      const roleFromMeta = logObj.metadata?.actorRole;
+      const roleFromDb = userRoleMap.get(logObj.performedBy);
+      let actorRole = roleFromMeta || roleFromDb;
+      if (!actorRole) {
+        if (logObj.performedBy === 'SYSTEM' || logObj.performedBy === 'system') {
+          actorRole = 'SYSTEM';
+        } else if (logObj.performedBy.startsWith('usr_')) {
+          actorRole = 'USER';
+        } else {
+          actorRole = 'SYSTEM';
+        }
+      }
+      return {
+        ...logObj,
+        actorId: logObj.performedBy,
+        actorRole,
+        targetResource: `${logObj.targetType}:${logObj.targetId}`
+      };
+    });
+
     return {
-      logs: logs.map(l => l.toJSON()),
+      logs: enrichedLogs,
       pagination: {
         total,
         page: pageNum,

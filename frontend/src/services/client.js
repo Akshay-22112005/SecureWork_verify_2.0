@@ -38,11 +38,18 @@ export async function apiClient(endpoint, options = {}) {
     ? endpoint
     : `${base}/${endpoint.replace(/^\/+/, '')}`;
   
-  const token = localStorage.getItem('securework_token');
+  // Check sessionStorage first (non-persistent), then localStorage (remember-me persistent)
+  const token = (() => {
+    const s = sessionStorage.getItem('securework_token');
+    if (s && s !== 'null' && s !== 'undefined') return s;
+    const l = localStorage.getItem('securework_token');
+    if (l && l !== 'null' && l !== 'undefined') return l;
+    return null;
+  })();
   const headers = { ...options.headers };
 
   // Automatically attach JWT authorization header where available unless explicitly skipped
-  if (!options.skipAuth && token && token !== 'null' && token !== 'undefined' && !headers['Authorization']) {
+  if (!options.skipAuth && token && !headers['Authorization']) {
     headers['Authorization'] = `Bearer ${token}`;
   }
 
@@ -63,6 +70,8 @@ export async function apiClient(endpoint, options = {}) {
   if (response.status === 401 && !endpoint.includes('/auth/login') && !endpoint.includes('/auth/register')) {
     localStorage.removeItem('securework_token');
     localStorage.removeItem('securework_user');
+    sessionStorage.removeItem('securework_token');
+    sessionStorage.removeItem('securework_user');
     if (typeof onSessionExpiredHandler === 'function') {
       onSessionExpiredHandler();
     }

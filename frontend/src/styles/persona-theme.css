@@ -268,7 +268,10 @@
 .persona-theme .stat-card,
 .persona-theme .role-portal-card,
 .persona-theme .action-card,
-.persona-theme .auth-card {
+.persona-theme .auth-card,
+.persona-theme .pricing-card:not(.highlighted-teal),
+.persona-theme .feature-preview-card,
+.persona-theme .trusted-by-wrapper {
   background: var(--p-glass-card) !important;
   backdrop-filter: blur(18px) !important;
   -webkit-backdrop-filter: blur(18px) !important;
@@ -285,12 +288,26 @@
 .persona-theme .metric-card:hover,
 .persona-theme .stat-card:hover,
 .persona-theme .role-portal-card:hover,
-.persona-theme .action-card:hover {
+.persona-theme .action-card:hover,
+.persona-theme .pricing-card:not(.highlighted-teal):hover,
+.persona-theme .feature-preview-card:hover {
   border-color: var(--p-border-glass-hover) !important;
   box-shadow: 0 16px 40px -4px rgba(0, 0, 0, 0.55), 
               0 0 24px 0 rgba(124, 92, 255, 0.25), 
               inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
   transform: translateY(-3px) !important;
+}
+
+.persona-theme .pricing-card.highlighted-teal {
+  background: linear-gradient(145deg, #0d9488 0%, #0f766e 100%) !important;
+  border: 1px solid var(--accent-teal) !important;
+  color: #ffffff !important;
+  box-shadow: 0 16px 36px -4px rgba(13, 148, 136, 0.45), 0 0 24px rgba(20, 184, 166, 0.25) !important;
+}
+
+.persona-theme .pricing-card.highlighted-teal:hover {
+  transform: translateY(-4px) !important;
+  box-shadow: 0 20px 44px -4px rgba(13, 148, 136, 0.55), 0 0 32px rgba(20, 184, 166, 0.35) !important;
 }
 
 /* Rising Dashboard Preview Entrance Effect */

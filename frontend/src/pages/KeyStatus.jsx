@@ -59,7 +59,59 @@ export default function KeyStatus({ onNavigate }) {
     finally { setSubmittingCompromise(false); }
   }
 
+  // Time left calculation with color-coding
+  function getKeyTimeLeft(key) {
+    if (!key) return null;
+    if (['RETIRED', 'REVOKED', 'COMPROMISED'].includes(key.status)) {
+      return { 
+        text: key.status, 
+        color: key.status === 'COMPROMISED' ? 'var(--color-danger, #ef4444)' : 'var(--text-muted)', 
+        isState: true 
+      };
+    }
+
+    const expiryDate = key.expiresAt || (key.activatedAt || key.createdAt ? new Date(new Date(key.activatedAt || key.createdAt).getTime() + 365 * 24 * 60 * 60 * 1000) : null);
+    if (!expiryDate) {
+      return { text: 'No expiry', color: 'var(--text-muted)', isState: false };
+    }
+
+    const now = new Date();
+    const diffMs = new Date(expiryDate) - now;
+    if (diffMs <= 0) {
+      return { text: 'Expired', color: 'var(--color-danger, #ef4444)', isState: true };
+    }
+
+    const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+    const hours = Math.floor((diffMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+    const minutes = Math.floor((diffMs % (60 * 60 * 1000)) / (60 * 1000));
+
+    let text = '';
+    if (days > 0) {
+      text = `${days}d ${hours}h left`;
+    } else if (hours > 0) {
+      text = `${hours}h ${minutes}m left`;
+    } else {
+      text = `${minutes}m left`;
+    }
+
+    let color = '#10b981'; // green > 30 days
+    if (days <= 7) {
+      color = 'var(--color-danger, #ef4444)'; // red <= 7 days
+    } else if (days <= 30) {
+      color = 'var(--color-warning, #f59e0b)'; // amber <= 30 days
+    }
+
+    return { 
+      text, 
+      color, 
+      days, 
+      isState: false, 
+      expiryDate: new Date(expiryDate).toLocaleDateString() 
+    };
+  }
+
   const activeKey = keys.find((k) => k.status === "ACTIVE");
+  const activeKeyTimeLeft = activeKey ? getKeyTimeLeft(activeKey) : null;
   const retiredKeys = keys.filter((k) => k.status !== "ACTIVE").sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   const allKeysSorted = [...keys].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
@@ -96,7 +148,27 @@ export default function KeyStatus({ onNavigate }) {
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
             <Key size={20} className="text-cyan" /><h3>Active Signing Key</h3>
           </div>
-          {activeKey && <StatusBadge status={activeKey.status} />}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {activeKeyTimeLeft && (
+              <span 
+                className="badge-tag"
+                style={{
+                  color: activeKeyTimeLeft.color,
+                  borderColor: activeKeyTimeLeft.color,
+                  background: 'rgba(0, 0, 0, 0.2)',
+                  fontWeight: 600,
+                  fontSize: '0.75rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+              >
+                <Clock size={12} />
+                {activeKeyTimeLeft.text}
+              </span>
+            )}
+            {activeKey && <StatusBadge status={activeKey.status} />}
+          </div>
         </div>
         {activeKey ? (
           <div>
@@ -107,6 +179,14 @@ export default function KeyStatus({ onNavigate }) {
               <div className="json-code-box" style={{ maxHeight: "120px" }}><pre>{activeKey.publicKeyPem || activeKey.publicKey}</pre></div>
             </div>
             <div className="detail-row"><span className="detail-label">Activated At</span><span className="text-muted text-xs">{new Date(activeKey.createdAt).toLocaleString()}</span></div>
+            <div className="detail-row">
+              <span className="detail-label">Key Expiration & Validity</span>
+              <span style={{ fontSize: '0.85rem' }}>
+                <span className="text-muted">Expires: {activeKeyTimeLeft?.expiryDate || 'N/A'}</span>
+                <span style={{ margin: '0 0.5rem' }}>·</span>
+                <strong style={{ color: activeKeyTimeLeft?.color }}>{activeKeyTimeLeft?.text}</strong>
+              </span>
+            </div>
             <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
               {onNavigate && <button className="action-btn primary text-xs" onClick={() => onNavigate("issue_credential")}><Award size={14} /> Issue Credential</button>}
               <button className="action-btn secondary text-xs" onClick={handleRotateKey} disabled={rotating}><RotateCcw size={14} /> Rotate Signing Key</button>
@@ -156,6 +236,17 @@ export default function KeyStatus({ onNavigate }) {
                         <Clock size={11} style={{ display: "inline", verticalAlign: "middle", marginRight: "3px" }} />
                         Created {new Date(k.createdAt).toLocaleString()}
                       </div>
+                      {k.status === "ACTIVE" ? (
+                        <div style={{ fontSize: "0.78rem", marginTop: "0.25rem" }}>
+                          <span className="text-muted">Expires: {getKeyTimeLeft(k)?.expiryDate || 'N/A'}</span>
+                          <span style={{ margin: "0 0.4rem" }}>·</span>
+                          <strong style={{ color: getKeyTimeLeft(k)?.color }}>{getKeyTimeLeft(k)?.text}</strong>
+                        </div>
+                      ) : (
+                        <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
+                          Status: <strong style={{ color: statusColor(k.status) }}>{k.status}</strong>
+                        </div>
+                      )}
                       {k.retiredAt && (
                         <div style={{ fontSize: "0.78rem", color: "var(--text-muted)", marginTop: "0.15rem" }}>
                           Retired: {new Date(k.retiredAt).toLocaleString()}
@@ -190,28 +281,36 @@ export default function KeyStatus({ onNavigate }) {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Key ID</th><th>Algorithm</th><th>Status</th>
+                <th>Key ID</th><th>Algorithm</th><th>Status</th><th>Time Remaining / State</th>
                 <th>Created</th><th>Retired / Changed</th><th>Reason</th><th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {retiredKeys.map((k) => (
-                <tr key={k.keyId}>
-                  <td className="code-snippet">{k.keyId}</td>
-                  <td>{k.algorithm}</td>
-                  <td><StatusBadge status={k.status} /></td>
-                  <td className="text-muted text-xs">{new Date(k.createdAt).toLocaleDateString()}</td>
-                  <td className="text-muted text-xs">{k.retiredAt ? new Date(k.retiredAt).toLocaleDateString() : "N/A"}</td>
-                  <td className="text-muted text-xs">{k.statusReason || "Rotated to new key"}</td>
-                  <td>
-                    {k.status === "RETIRED" && (
-                      <button className="action-btn danger text-xs" style={{ padding: "3px 8px", fontSize: "0.7rem" }} onClick={() => setCompromiseTarget(k)}>
-                        <AlertOctagon size={11} /> Flag
-                      </button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {retiredKeys.map((k) => {
+                const tl = getKeyTimeLeft(k);
+                return (
+                  <tr key={k.keyId}>
+                    <td className="code-snippet">{k.keyId}</td>
+                    <td>{k.algorithm}</td>
+                    <td><StatusBadge status={k.status} /></td>
+                    <td>
+                      <span style={{ color: tl?.color, fontWeight: 600, fontSize: '0.78rem' }}>
+                        {tl?.text}
+                      </span>
+                    </td>
+                    <td className="text-muted text-xs">{new Date(k.createdAt).toLocaleDateString()}</td>
+                    <td className="text-muted text-xs">{k.retiredAt ? new Date(k.retiredAt).toLocaleDateString() : "N/A"}</td>
+                    <td className="text-muted text-xs">{k.statusReason || "Rotated to new key"}</td>
+                    <td>
+                      {k.status === "RETIRED" && (
+                        <button className="action-btn danger text-xs" style={{ padding: "3px 8px", fontSize: "0.7rem" }} onClick={() => setCompromiseTarget(k)}>
+                          <AlertOctagon size={11} /> Flag
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}

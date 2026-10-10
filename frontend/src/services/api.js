@@ -37,6 +37,7 @@ export const api = {
 
   // OCR & AI Analysis
   analysis: {
+    upload: (formData) => apiClient('/analysis/upload', { method: 'POST', body: formData }),
     runOcr: (documentId) => apiClient('/analysis/ocr', { method: 'POST', body: { documentId } }),
     runAi: (documentId) => apiClient('/analysis/document', { method: 'POST', body: { documentId } }),
     getByDocumentId: (documentId) => apiClient(`/analysis/${documentId}`)
@@ -94,8 +95,16 @@ export const api = {
     approve: (id) => apiClient(`/issuers/${id}/approve`, { method: 'PATCH' }),
     suspend: (id, reason) => apiClient(`/issuers/${id}/suspend`, { method: 'PATCH', body: { reason } }),
     revoke: (id, reason) => apiClient(`/issuers/${id}/revoke`, { method: 'PATCH', body: { reason } }),
-    rotateKey: (id, data = {}) => apiClient(`/issuers/${id}/rotate-key`, { method: 'POST', body: data })
+    rotateKey: (id, data = {}) => apiClient(`/issuers/${id}/rotate-key`, { method: 'POST', body: data }),
+    lookupRecipient: (email) => apiClient(`/issuers/recipients/lookup?email=${encodeURIComponent(email)}`)
   },
+
+  // HR Persona Candidate Verification & Enumeration
+  hr: {
+    getSubjectCredentials: (userIdOrEmail) => apiClient(`/hr/subjects/${encodeURIComponent(userIdOrEmail)}/credentials`),
+    verify: (data) => apiClient('/hr/verify', { method: 'POST', body: data })
+  },
+
 
   // Issuer Keys
   issuerKeys: {

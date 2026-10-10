@@ -356,6 +356,63 @@ class IssuerService {
 
     return issuer.toJSON();
   }
+
+  /**
+   * Lookup candidate recipient by email and return their uploaded document metadata (no raw binary content).
+   * Restricted to ISSUER and ADMIN roles. Writes an audit log entry on lookup.
+   * @param {string} email
+   * @param {object} actorUser
+   * @returns {Promise<{ found: boolean, recipient: object|null, documents: object[] }>}
+   */
+  async lookupRecipientByEmail(email, actorUser) {
+    if (!email || typeof email !== 'string' || !email.includes('@')) {
+      throw new ValidationError('A valid recipient email address is required', 'INVALID_EMAIL');
+    }
+
+    const User = require('../models/user.model');
+    const Document = require('../models/document.model');
+
+    const recipient = await User.findOne({ email: email.toLowerCase().trim() });
+    if (!recipient) {
+      return {
+        found: false,
+        recipient: null,
+        documents: []
+      };
+    }
+
+    // Retrieve document metadata only (no file binary content)
+    const documents = await Document.find(
+      { uploadedBy: recipient.userId },
+      { originalFilename: 1, mimeType: 1, fileSize: 1, sha256Hash: 1, representationType: 1, createdAt: 1, documentId: 1 }
+    ).sort({ createdAt: -1 });
+
+    // Privacy audit log entry whenever issuer queries recipient uploads
+    await auditService.recordEvent(
+      actorUser.userId,
+      actorUser.role,
+      'RECIPIENT_UPLOADS_VIEWED',
+      recipient.userId,
+      {
+        recipientUserId: recipient.userId,
+        recipientEmail: recipient.email,
+        documentsCount: documents.length,
+        actorRole: actorUser.role
+      }
+    );
+
+    return {
+      found: true,
+      recipient: {
+        userId: recipient.userId,
+        name: recipient.name,
+        email: recipient.email,
+        status: recipient.status
+      },
+      documents: documents.map((d) => d.toJSON())
+    };
+  }
 }
 
 module.exports = new IssuerService();
+

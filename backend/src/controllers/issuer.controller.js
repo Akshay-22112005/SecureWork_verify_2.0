@@ -89,6 +89,19 @@ async function revokeIssuer(req, res, next) {
   }
 }
 
+/**
+ * Lookup recipient user and uploaded documents (GET /api/issuers/recipients/lookup?email=...).
+ * Restricted to ISSUER and ADMIN roles.
+ */
+async function lookupRecipient(req, res, next) {
+  try {
+    const result = await issuerService.lookupRecipientByEmail(req.query.email, req.user);
+    return successResponse(res, result, 200);
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   registerIssuer,
   listIssuers,
@@ -96,5 +109,7 @@ module.exports = {
   getIssuerById,
   approveIssuer,
   suspendIssuer,
-  revokeIssuer
+  revokeIssuer,
+  lookupRecipient
 };
+

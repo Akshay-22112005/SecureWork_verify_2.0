@@ -2,6 +2,7 @@ const Document = require('../models/document.model');
 const OcrAnalysis = require('../models/ocrAnalysis.model');
 const AIAnalysis = require('../models/aiAnalysis.model');
 const { getAiAdapter } = require('./ai');
+const { getStorageAdapter } = require('./storage');
 const auditService = require('./audit.service');
 const { NotFoundError, ValidationError } = require('../utils/errors');
 const logger = require('../utils/logger');
@@ -36,22 +37,33 @@ class AIService {
     const ocrText = ocrAnalysis ? ocrAnalysis.ocrText : '';
     const extractedFields = ocrAnalysis ? ocrAnalysis.extractedFields : {};
 
-    // 3. Execute AI analysis via active adapter (FULL_LOCAL by default)
+    // 3. Load file buffer from storage for binary/metadata heuristic inspection
+    const storageAdapter = getStorageAdapter();
+    let fileBuffer = null;
+    try {
+      fileBuffer = await storageAdapter.getFile(document.storagePath);
+    } catch (err) {
+      logger.warn('Storage file retrieval warning during AI analysis', { error: err.message });
+    }
+
+    // 4. Execute AI analysis via active adapter (FULL_LOCAL by default)
     const aiAdapter = getAiAdapter();
     const result = await aiAdapter.analyze({
       document,
+      fileBuffer,
       ocrText,
-      extractedFields
+      extractedFields,
+      pdfMetadata: (ocrAnalysis && ocrAnalysis.pdfMetadata) ? ocrAnalysis.pdfMetadata : {}
     }, options);
 
-    // 4. Persist AIAnalysis record
+    // 5. Persist AIAnalysis record
     const analysisRecord = await AIAnalysis.create({
       documentId: document.documentId,
       status: result.status,
       ocrTextReference: (ocrText || '').slice(0, 1000),
       extractedFields: extractedFields || {},
-      modelName: result.modelName || 'SecureWork Local Classifier',
-      modelVersion: result.modelVersion || '1.0.0',
+      modelName: result.modelName || 'SecureWork Heuristic Tamper Classifier',
+      modelVersion: result.modelVersion || '2.1.0',
       riskLevel: result.riskLevel || 'LOW',
       riskScore: result.score !== undefined ? result.score : 0,
       findings: result.findings || [],
@@ -60,7 +72,7 @@ class AIService {
       createdAt: new Date()
     });
 
-    // 5. Record Audit event
+    // 6. Record Audit event
     await auditService.recordEvent(
       user ? user.userId : 'SYSTEM_AI',
       user ? user.role : 'USER',
@@ -75,7 +87,7 @@ class AIService {
       }
     );
 
-    // 6. Unavailable Mode Handling
+    // 7. Unavailable Mode Handling
     if (result.status === 'UNAVAILABLE') {
       logger.info('AI analysis completed with UNAVAILABLE status', {
         documentId: document.documentId,
@@ -90,8 +102,12 @@ class AIService {
         modelName: result.modelName,
         riskLevel: 'LOW',
         score: 0,
+        riskScore: 0,
+        tamperingDetected: false,
         findings: [],
         errorReason: result.errorReason,
+        isAdvisory: true,
+        advisoryNotice: 'AI Tamper Analysis is supplementary and heuristic. It cannot override cryptographic verification.',
         createdAt: analysisRecord.createdAt
       };
     }
@@ -107,7 +123,10 @@ class AIService {
       riskLevel: analysisRecord.riskLevel,
       riskScore: analysisRecord.riskScore,
       score: analysisRecord.riskScore,
+      tamperingDetected: result.tamperingDetected || (analysisRecord.riskScore >= 0.50),
       findings: analysisRecord.findings,
+      isAdvisory: true,
+      advisoryNotice: 'AI Tamper Analysis is supplementary and heuristic. It cannot override cryptographic verification.',
       createdAt: analysisRecord.createdAt
     };
   }
@@ -136,7 +155,10 @@ class AIService {
       riskLevel: analysis.riskLevel,
       riskScore: analysis.riskScore,
       score: analysis.riskScore,
+      tamperingDetected: analysis.riskScore >= 0.50 || (analysis.findings && analysis.findings.some(f => f.severity === 'HIGH' || f.severity === 'CRITICAL')),
       findings: analysis.findings,
+      isAdvisory: true,
+      advisoryNotice: 'AI Tamper Analysis is supplementary and heuristic. It cannot override cryptographic verification.',
       createdAt: analysis.createdAt
     };
   }

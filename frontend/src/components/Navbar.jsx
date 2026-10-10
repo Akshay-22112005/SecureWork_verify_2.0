@@ -18,12 +18,14 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useNavigate } from 'react-router-dom';
 import StatusBadge from './StatusBadge';
 import ThemeToggle from './ThemeToggle';
 
 export default function Navbar({ onNavigate, activePage, onToggleMobileMenu, mobileMenuOpen }) {
-  const { user, role, logout, login } = useAuth();
+  const { user, role, logout, isAdmin } = useAuth();
   const { unreadCount, toggleDrawer } = useNotifications();
+  const navigate = useNavigate();
   const [showProfileCard, setShowProfileCard] = useState(false);
   const [copiedField, setCopiedField] = useState(null);
 
@@ -34,29 +36,49 @@ export default function Navbar({ onNavigate, activePage, onToggleMobileMenu, mob
     setTimeout(() => setCopiedField(null), 2000);
   }
 
+  function handleLogout() {
+    logout();
+    navigate('/', { replace: true });
+  }
+
   // Quick Persona switchers for development & evaluation
   const demoPersonas = [
-    { label: 'ADMIN', email: 'admin@securework.local', role: 'ADMIN' },
-    { label: 'AUDITOR', email: 'auditor@securework.local', role: 'AUDITOR' },
-    { label: 'ISSUER', email: 'issuer_auth@stanford.edu', role: 'ISSUER' },
-    { label: 'HR', email: 'hr_lead@enterprise.local', role: 'HR' },
-    { label: 'USER', email: 'scholar@stanford.edu', role: 'USER' }
+    { label: 'ADMIN', role: 'ADMIN', email: 'admin@securework.local' },
+    { label: 'AUDITOR', role: 'AUDITOR', email: 'auditor@securework.local' },
+    { label: 'ISSUER', role: 'ISSUER', email: 'issuer_auth@stanford.edu' },
+    { label: 'HR', role: 'HR', email: 'hr_lead@enterprise.local' },
+    { label: 'USER', role: 'USER', email: 'scholar@stanford.edu' }
   ];
 
-  async function handleQuickSwitch(persona) {
-    try {
-      if (persona.role === 'ADMIN') {
-        await login('admin@securework.local', 'AdminSecurePass123!');
-      } else {
-        await login(persona.email, 'SecureUserPass123!');
-      }
-    } catch {
-      try {
-        await login(persona.email, 'AdminSecurePass123!');
-      } catch (e) {
-        console.warn('Persona switch failed', e);
-      }
+  /**
+   * Persona switching rules:
+   * - ADMIN may switch to any persona view without re-login (they have all access).
+   * - Any other role switching to a different persona must logout and go to /login
+   *   with the target persona preselected and a message.
+   */
+  function handlePersonaSwitch(persona) {
+    if (persona.role === role) {
+      // Already on this persona, do nothing
+      return;
     }
+
+    if (isAdmin) {
+      // ADMIN can view any persona view without re-login.
+      // For now we just show a note – in practice ADMIN sees all sidebar sections already.
+      // Navigate to dashboard to refresh the view.
+      navigate('/dashboard');
+      return;
+    }
+
+    // Non-admin switching persona: logout and redirect to login with persona preselected
+    logout();
+    navigate('/login', {
+      replace: true,
+      state: {
+        persona: persona.role,
+        personaMessage: `Please sign in as a ${persona.label} to continue.`
+      }
+    });
   }
 
   return (
@@ -86,15 +108,21 @@ export default function Navbar({ onNavigate, activePage, onToggleMobileMenu, mob
       </div>
 
       <div className="nav-right-cluster">
-        {/* Quick Persona Switcher for Evaluation */}
+        {/* Quick Persona Switcher */}
         <div className="persona-selector">
           <span className="persona-title"><Sparkles size={13} /> Persona:</span>
           {demoPersonas.map((p) => (
             <button
               key={p.role}
               className={`persona-pill ${role === p.role ? 'active' : ''}`}
-              onClick={() => handleQuickSwitch(p)}
-              title={`Switch active session to ${p.role}`}
+              onClick={() => handlePersonaSwitch(p)}
+              title={
+                isAdmin
+                  ? `View as ${p.role} (ADMIN access)`
+                  : role === p.role
+                    ? `Current role: ${p.role}`
+                    : `Switch to ${p.role} — will require login`
+              }
             >
               {p.label}
             </button>
@@ -143,7 +171,7 @@ export default function Navbar({ onNavigate, activePage, onToggleMobileMenu, mob
                 className="logout-btn" 
                 onClick={(e) => {
                   e.stopPropagation();
-                  logout();
+                  handleLogout();
                 }} 
                 title="Sign Out"
               >
@@ -216,7 +244,7 @@ export default function Navbar({ onNavigate, activePage, onToggleMobileMenu, mob
               <div className="hover-card-footer">
                 <button 
                   className="action-btn secondary text-xs full-width" 
-                  onClick={logout}
+                  onClick={handleLogout}
                   style={{ display: 'flex', justifyContent: 'center', gap: '0.4rem' }}
                 >
                   <LogOut size={13} /> Sign Out

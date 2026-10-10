@@ -440,7 +440,6 @@ export default function SimplePricingPreview({ onNavigate }) {
                     <button 
                       type="submit" 
                       className="action-btn primary"
-                      style={{ background: '#0d9488', borderColor: '#0d9488' }}
                     >
                       <Send size={14} /> Submit Inquiry
                     </button>

@@ -24,13 +24,17 @@ import {
   Github
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { useLocation } from 'react-router-dom';
 import ThemeToggle from '../components/ThemeToggle';
 import PublicVerifyBox from '../components/PublicVerifyBox';
 import HeroVisualAnimation from '../components/HeroVisualAnimation';
 import FaqAccordion from '../components/FaqAccordion';
+import AnimateOnScroll from '../components/AnimateOnScroll';
+import FloatingBackground from '../components/FloatingBackground';
 
 export default function LandingPage({ onNavigate }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
+  const location = useLocation();
   const [statsCount, setStatsCount] = useState({
     verified: 99.98,
     speed: 12,
@@ -58,6 +62,9 @@ export default function LandingPage({ onNavigate }) {
 
   return (
     <div className="landing-page-root">
+      {/* Floating geometric particles in background */}
+      <FloatingBackground />
+
       {/* ═══ 1. STICKY GLASS NAVBAR ═══ */}
       <header className="landing-navbar">
         <div className="landing-nav-container">
@@ -82,7 +89,7 @@ export default function LandingPage({ onNavigate }) {
           <div className="landing-nav-actions">
             <ThemeToggle size="md" />
 
-            {isAuthenticated ? (
+            {!loading && isAuthenticated ? (
               <button 
                 type="button" 
                 className="btn btn-primary btn-sm"
@@ -143,7 +150,7 @@ export default function LandingPage({ onNavigate }) {
               <button 
                 type="button" 
                 className="btn btn-outline btn-lg"
-                onClick={() => onNavigate(isAuthenticated ? 'dashboard' : 'register')}
+                onClick={() => onNavigate(!loading && isAuthenticated ? 'dashboard' : 'register')}
               >
                 <span>Get Started Free</span>
                 <ArrowRight size={18} />
@@ -164,225 +171,243 @@ export default function LandingPage({ onNavigate }) {
       </section>
 
       {/* ═══ 3. LIVE STATS STRIP ═══ */}
-      <section className="landing-stats-strip" aria-label="Platform Performance Metrics">
-        <div className="landing-stats-container">
-          <div className="stat-item">
-            <div className="stat-item-number">{statsCount.verified}%</div>
-            <div className="stat-item-label">Cryptographic Accuracy</div>
+      <AnimateOnScroll animation="fade-up">
+        <section className="landing-stats-strip" aria-label="Platform Performance Metrics">
+          <div className="landing-stats-container">
+            <div className="stat-item">
+              <div className="stat-item-number">{statsCount.verified}%</div>
+              <div className="stat-item-label">Cryptographic Accuracy</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-item-number">&lt; {statsCount.speed}ms</div>
+              <div className="stat-item-label">Deterministic Verification</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-item-number">#{statsCount.blocks.toLocaleString()}</div>
+              <div className="stat-item-label">Audit Blocks Sealed</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-item-number">$0 Gas</div>
+              <div className="stat-item-label">Zero Blockchain Overhead</div>
+            </div>
+            <div className="stat-item">
+              <div className="stat-item-number">100%</div>
+              <div className="stat-item-label">Offline Capable</div>
+            </div>
           </div>
-          <div className="stat-item">
-            <div className="stat-item-number">&lt; {statsCount.speed}ms</div>
-            <div className="stat-item-label">Deterministic Verification</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-item-number">#{statsCount.blocks.toLocaleString()}</div>
-            <div className="stat-item-label">Audit Blocks Sealed</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-item-number">$0 Gas</div>
-            <div className="stat-item-label">Zero Blockchain Overhead</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-item-number">100%</div>
-            <div className="stat-item-label">Offline Capable</div>
-          </div>
-        </div>
-      </section>
+        </section>
+      </AnimateOnScroll>
 
       {/* ═══ 4. "HOW IT WORKS" 4 STEPS ═══ */}
       <section id="how-it-works" className="landing-section">
-        <div className="section-header">
-          <div className="section-badge">
-            <Cpu size={14} />
-            <span>Cryptographic Workflow</span>
-          </div>
-          <h2 className="section-title">How Digital Trust Works in 4 Steps</h2>
-          <p className="section-subtitle">
-            Deterministic serialization, asymmetric key signatures, and Merkle hash linking deliver tamper-proof verification without human bottlenecks.
-          </p>
-        </div>
-
-        <div className="how-steps-grid">
-          <div className="how-step-card">
-            <div className="how-step-number">01</div>
-            <h3 className="how-step-title">Canonical Issue</h3>
-            <p className="how-step-desc">
-              Accredited organizations issue qualification claims formatted according to RFC 8785 JSON Canonicalization Scheme (JCS) for byte-level deterministic hashing.
+        <AnimateOnScroll animation="fade-up">
+          <div className="section-header">
+            <div className="section-badge">
+              <Cpu size={14} />
+              <span>Cryptographic Workflow</span>
+            </div>
+            <h2 className="section-title">How Digital Trust Works in 4 Steps</h2>
+            <p className="section-subtitle">
+              Deterministic serialization, asymmetric key signatures, and Merkle hash linking deliver tamper-proof verification without human bottlenecks.
             </p>
           </div>
+        </AnimateOnScroll>
 
-          <div className="how-step-card">
-            <div className="how-step-number">02</div>
-            <h3 className="how-step-title">Asymmetric Sign</h3>
-            <p className="how-step-desc">
-              The payload is digitally signed with an isolated Ed25519 or RSA-PSS private key stored in secure local hardware vaults and linked to the SHA-256 audit chain.
-            </p>
-          </div>
+        <AnimateOnScroll staggerSelector=".how-step-card" staggerDelay={60}>
+          <div className="how-steps-grid">
+            <div className="how-step-card">
+              <div className="how-step-number">01</div>
+              <h3 className="how-step-title">Canonical Issue</h3>
+              <p className="how-step-desc">
+                Accredited organizations issue qualification claims formatted according to RFC 8785 JSON Canonicalization Scheme (JCS) for byte-level deterministic hashing.
+              </p>
+            </div>
 
-          <div className="how-step-card">
-            <div className="how-step-number">03</div>
-            <h3 className="how-step-title">Share via QR</h3>
-            <p className="how-step-desc">
-              Holders receive verifiable PDF credentials, signed QR codes with compact offline tokens, and portable JSON verification bundles.
-            </p>
-          </div>
+            <div className="how-step-card">
+              <div className="how-step-number">02</div>
+              <h3 className="how-step-title">Asymmetric Sign</h3>
+              <p className="how-step-desc">
+                The payload is digitally signed with an isolated Ed25519 or RSA-PSS private key stored in secure local hardware vaults and linked to the SHA-256 audit chain.
+              </p>
+            </div>
 
-          <div className="how-step-card">
-            <div className="how-step-number">04</div>
-            <h3 className="how-step-title">Instant Verify</h3>
-            <p className="how-step-desc">
-              Recruiters and employers verify signatures mathematically in milliseconds online or offline using public keys, without incurring API fees or gas costs.
-            </p>
+            <div className="how-step-card">
+              <div className="how-step-number">03</div>
+              <h3 className="how-step-title">Share via QR</h3>
+              <p className="how-step-desc">
+                Holders receive verifiable PDF credentials, signed QR codes with compact offline tokens, and portable JSON verification bundles.
+              </p>
+            </div>
+
+            <div className="how-step-card">
+              <div className="how-step-number">04</div>
+              <h3 className="how-step-title">Instant Verify</h3>
+              <p className="how-step-desc">
+                Recruiters and employers verify signatures mathematically in milliseconds online or offline using public keys, without incurring API fees or gas costs.
+              </p>
+            </div>
           </div>
-        </div>
+        </AnimateOnScroll>
       </section>
 
       {/* ═══ 5. FEATURE GRID ═══ */}
       <section id="features" className="landing-section" style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-subtle)', borderBottom: '1px solid var(--border-subtle)' }}>
-        <div className="section-header">
-          <div className="section-badge">
-            <Sparkles size={14} />
-            <span>Core Capabilities</span>
-          </div>
-          <h2 className="section-title">Engineered for Sovereign Verification</h2>
-          <p className="section-subtitle">
-            Enterprise security features designed from the ground up for high throughput, regulatory compliance, and total autonomy.
-          </p>
-        </div>
-
-        <div className="feature-grid">
-          <div className="feature-card">
-            <div className="feature-icon-box">
-              <Terminal size={26} />
+        <AnimateOnScroll animation="fade-up">
+          <div className="section-header">
+            <div className="section-badge">
+              <Sparkles size={14} />
+              <span>Core Capabilities</span>
             </div>
-            <h3 className="feature-card-title">Offline Verification CLI</h3>
-            <p className="feature-card-desc">
-              Download standalone verification bundles and verify credentials anywhere without internet access via standard Node.js crypto: <code>npm run verify:offline -- bundle.json</code>.
+            <h2 className="section-title">Engineered for Sovereign Verification</h2>
+            <p className="section-subtitle">
+              Enterprise security features designed from the ground up for high throughput, regulatory compliance, and total autonomy.
             </p>
           </div>
+        </AnimateOnScroll>
 
-          <div className="feature-card">
-            <div className="feature-icon-box">
-              <Layers size={26} />
+        <AnimateOnScroll staggerSelector=".feature-card" staggerDelay={50}>
+          <div className="feature-grid">
+            <div className="feature-card">
+              <div className="feature-icon-box">
+                <Terminal size={26} />
+              </div>
+              <h3 className="feature-card-title">Offline Verification CLI</h3>
+              <p className="feature-card-desc">
+                Download standalone verification bundles and verify credentials anywhere without internet access via standard Node.js crypto: <code>npm run verify:offline -- bundle.json</code>.
+              </p>
             </div>
-            <h3 className="feature-card-title">Tamper-Evident SHA-256 Audit Chain</h3>
-            <p className="feature-card-desc">
-              Every issuance, verification, key rotation, and revocation creates an immutable cryptographic block linked via previous-block hashes for full auditability.
-            </p>
-          </div>
 
-          <div className="feature-card">
-            <div className="feature-icon-box">
-              <Zap size={26} />
+            <div className="feature-card">
+              <div className="feature-icon-box">
+                <Layers size={26} />
+              </div>
+              <h3 className="feature-card-title">Tamper-Evident SHA-256 Audit Chain</h3>
+              <p className="feature-card-desc">
+                Every issuance, verification, key rotation, and revocation creates an immutable cryptographic block linked via previous-block hashes for full auditability.
+              </p>
             </div>
-            <h3 className="feature-card-title">Zero Blockchain & Zero Gas</h3>
-            <p className="feature-card-desc">
-              Pure open-source asymmetric cryptography eliminates expensive transaction fees, slow block confirmation times, and private data exposure on public ledgers.
-            </p>
-          </div>
 
-          <div className="feature-card">
-            <div className="feature-icon-box">
-              <FileCheck size={26} />
+            <div className="feature-card">
+              <div className="feature-icon-box">
+                <Zap size={26} />
+              </div>
+              <h3 className="feature-card-title">Zero Blockchain & Zero Gas</h3>
+              <p className="feature-card-desc">
+                Pure open-source asymmetric cryptography eliminates expensive transaction fees, slow block confirmation times, and private data exposure on public ledgers.
+              </p>
             </div>
-            <h3 className="feature-card-title">OCR & AI Advisory Intelligence</h3>
-            <p className="feature-card-desc">
-              Local Tesseract.js optical character recognition extracts textual claims to assist human reviewers while strictly keeping cryptographic proofs as the single source of truth.
-            </p>
-          </div>
 
-          <div className="feature-card">
-            <div className="feature-icon-box">
-              <Users size={26} />
+            <div className="feature-card">
+              <div className="feature-icon-box">
+                <FileCheck size={26} />
+              </div>
+              <h3 className="feature-card-title">OCR & AI Advisory Intelligence</h3>
+              <p className="feature-card-desc">
+                Local Tesseract.js optical character recognition extracts textual claims to assist human reviewers while strictly keeping cryptographic proofs as the single source of truth.
+              </p>
             </div>
-            <h3 className="feature-card-title">Granular Role-Based Access Control</h3>
-            <p className="feature-card-desc">
-              Tailored workflows and strict permission boundaries for Platform Administrators, Accredited Issuers, HR Lead Verifiers, Compliance Auditors, and Credential Holders.
-            </p>
-          </div>
 
-          <div className="feature-card">
-            <div className="feature-icon-box">
-              <Database size={26} />
+            <div className="feature-card">
+              <div className="feature-icon-box">
+                <Users size={26} />
+              </div>
+              <h3 className="feature-card-title">Granular Role-Based Access Control</h3>
+              <p className="feature-card-desc">
+                Tailored workflows and strict permission boundaries for Platform Administrators, Accredited Issuers, HR Lead Verifiers, Compliance Auditors, and Credential Holders.
+              </p>
             </div>
-            <h3 className="feature-card-title">B2B API Keys & Webhooks</h3>
-            <p className="feature-card-desc">
-              High-throughput REST APIs and HMAC-SHA256 signed webhooks enable automated HRIS credential verification and instant revocation event streaming.
-            </p>
+
+            <div className="feature-card">
+              <div className="feature-icon-box">
+                <Database size={26} />
+              </div>
+              <h3 className="feature-card-title">B2B API Keys & Webhooks</h3>
+              <p className="feature-card-desc">
+                High-throughput REST APIs and HMAC-SHA256 signed webhooks enable automated HRIS credential verification and instant revocation event streaming.
+              </p>
+            </div>
           </div>
-        </div>
+        </AnimateOnScroll>
       </section>
 
       {/* ═══ 6. SECURITY PRINCIPLES SECTION ═══ */}
       <section id="security-principles" className="landing-section">
-        <div className="section-header">
-          <div className="section-badge">
-            <Lock size={14} />
-            <span>Cryptographic Architecture</span>
-          </div>
-          <h2 className="section-title">Core Security Principles</h2>
-          <p className="section-subtitle">
-            Built strictly adhering to zero-trust architecture and cryptographic standards.
-          </p>
-        </div>
-
-        <div className="security-principles-grid">
-          <div className="security-card">
-            <div className="security-card-header">
-              <ShieldCheck size={20} className="text-emerald" />
-              <span>Evidence First</span>
+        <AnimateOnScroll animation="fade-up">
+          <div className="section-header">
+            <div className="section-badge">
+              <Lock size={14} />
+              <span>Cryptographic Architecture</span>
             </div>
-            <p className="security-card-desc">
-              No credential status can be marked verified without immutable cryptographic or registry-backed evidence.
+            <h2 className="section-title">Core Security Principles</h2>
+            <p className="section-subtitle">
+              Built strictly adhering to zero-trust architecture and cryptographic standards.
             </p>
           </div>
+        </AnimateOnScroll>
 
-          <div className="security-card">
-            <div className="security-card-header">
-              <Key size={20} className="text-cyan" />
-              <span>Isolated Private Key Vaults</span>
+        <AnimateOnScroll staggerSelector=".security-card" staggerDelay={60}>
+          <div className="security-principles-grid">
+            <div className="security-card">
+              <div className="security-card-header">
+                <ShieldCheck size={20} className="text-emerald" />
+                <span>Evidence First</span>
+              </div>
+              <p className="security-card-desc">
+                No credential status can be marked verified without immutable cryptographic or registry-backed evidence.
+              </p>
             </div>
-            <p className="security-card-desc">
-              Private keys remain isolated in secure local vaults and are never exposed over APIs or transmitted across network boundaries.
-            </p>
-          </div>
 
-          <div className="security-card">
-            <div className="security-card-header">
-              <Cpu size={20} className="text-indigo" />
-              <span>RFC 8785 Canonicalization</span>
+            <div className="security-card">
+              <div className="security-card-header">
+                <Key size={20} className="text-cyan" />
+                <span>Isolated Private Key Vaults</span>
+              </div>
+              <p className="security-card-desc">
+                Private keys remain isolated in secure local vaults and are never exposed over APIs or transmitted across network boundaries.
+              </p>
             </div>
-            <p className="security-card-desc">
-              Payloads are canonicalized with strict deterministic sorting and formatting before signing to guarantee identical signature verification across all systems.
-            </p>
-          </div>
 
-          <div className="security-card">
-            <div className="security-card-header">
-              <Award size={20} className="text-amber" />
-              <span>NIST Key Lifecycle Management</span>
+            <div className="security-card">
+              <div className="security-card-header">
+                <Cpu size={20} className="text-indigo" />
+                <span>RFC 8785 Canonicalization</span>
+              </div>
+              <p className="security-card-desc">
+                Payloads are canonicalized with strict deterministic sorting and formatting before signing to guarantee identical signature verification across all systems.
+              </p>
             </div>
-            <p className="security-card-desc">
-              Complete key rotation and revocation tracking maintains full backwards verification integrity for historical credentials.
-            </p>
+
+            <div className="security-card">
+              <div className="security-card-header">
+                <Award size={20} className="text-amber" />
+                <span>NIST Key Lifecycle Management</span>
+              </div>
+              <p className="security-card-desc">
+                Complete key rotation and revocation tracking maintains full backwards verification integrity for historical credentials.
+              </p>
+            </div>
           </div>
-        </div>
+        </AnimateOnScroll>
       </section>
 
       {/* ═══ 7. FAQ ACCORDION ═══ */}
       <section id="faq" className="landing-section" style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-subtle)' }}>
-        <div className="section-header">
-          <div className="section-badge">
-            <FileText size={14} />
-            <span>Answers</span>
+        <AnimateOnScroll animation="fade-up">
+          <div className="section-header">
+            <div className="section-badge">
+              <FileText size={14} />
+              <span>Answers</span>
+            </div>
+            <h2 className="section-title">Frequently Asked Questions</h2>
+            <p className="section-subtitle">
+              Understand how SecureWork Verify compares with legacy blockchain and third-party SaaS verification.
+            </p>
           </div>
-          <h2 className="section-title">Frequently Asked Questions</h2>
-          <p className="section-subtitle">
-            Understand how SecureWork Verify compares with legacy blockchain and third-party SaaS verification.
-          </p>
-        </div>
+        </AnimateOnScroll>
 
-        <FaqAccordion />
+        <AnimateOnScroll animation="fade-up" delay={80}>
+          <FaqAccordion />
+        </AnimateOnScroll>
       </section>
 
       {/* ═══ 8. FOOTER ═══ */}

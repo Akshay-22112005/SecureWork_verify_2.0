@@ -1,8 +1,12 @@
 const express = require('express');
 const ocrController = require('../controllers/ocr.controller');
-const { optionalAuthenticateUser } = require('../middleware/auth');
+const { optionalAuthenticateUser, authenticateUser } = require('../middleware/auth');
+const { handleDocumentUpload } = require('../middleware/upload');
 
 const router = express.Router();
+
+// Direct document upload and end-to-end OCR + AI tamper analysis (POST /api/analysis/upload)
+router.post('/upload', optionalAuthenticateUser, handleDocumentUpload, ocrController.uploadAndAnalyze);
 
 // Execute AI document risk analysis (POST /api/analysis/document)
 router.post('/document', optionalAuthenticateUser, ocrController.performDocumentAnalysis);

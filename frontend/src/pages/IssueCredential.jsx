@@ -40,8 +40,39 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [issuedResult, setIssuedResult] = useState(null);
-  const [availableUsers, setAvailableUsers] = useState([]);
-  const [availableDocs, setAvailableDocs] = useState([]);
+  const [recipientEmail, setRecipientEmail] = useState(initialParams.recipientEmail || "");
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [recipientData, setRecipientData] = useState(null);
+  const [recipientDocs, setRecipientDocs] = useState([]);
+  const [lookupSearched, setLookupSearched] = useState(false);
+
+  async function handleLookupRecipient(targetEmail) {
+    const emailToLookup = targetEmail || recipientEmail;
+    if (!emailToLookup || !emailToLookup.includes('@')) {
+      setError("Please enter a valid recipient email address to search.");
+      return;
+    }
+    setError("");
+    setLookupLoading(true);
+    setLookupSearched(true);
+    try {
+      const res = await api.issuers.lookupRecipient(emailToLookup.trim());
+      if (res && res.success && res.data.found) {
+        setRecipientData(res.data.recipient);
+        setRecipientId(res.data.recipient.userId);
+        setRecipientDocs(res.data.documents || []);
+      } else {
+        setRecipientData(null);
+        setRecipientDocs([]);
+      }
+    } catch (err) {
+      setError(err.message || "Failed to lookup recipient user");
+      setRecipientData(null);
+      setRecipientDocs([]);
+    } finally {
+      setLookupLoading(false);
+    }
+  }
   const [activeTab, setActiveTab] = useState("single");
   const fileRef = useRef(null);
   const [csvHeaders, setCsvHeaders] = useState([]);
@@ -153,32 +184,126 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
                   {issuers.map((i) => <option key={i.issuerId} value={i.issuerId}>{i.issuerCode} ({i.status}) - {i.issuerId}</option>)}
                 </select>
               </div>
+
+              {/* Recipient Subject by Email Lookup */}
               <div className="form-group">
-                <label>Recipient Subject (User ID)</label>
-                <input type="text" placeholder="usr_0123456789abcdef" value={recipientId} onChange={(e) => setRecipientId(e.target.value)} required />
-                {availableUsers.length > 0 && (
-                  <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginTop: "0.4rem" }}>
-                    <span className="text-muted text-xs" style={{ alignSelf: "center" }}>Quick select:</span>
-                    {availableUsers.filter((u) => u.role === "USER" || u.email.includes("scholar")).slice(0, 3).map((u) => (
-                      <button type="button" key={u.userId} className="persona-pill text-xs" style={{ padding: "2px 8px", fontSize: "0.72rem", cursor: "pointer" }} onClick={() => setRecipientId(u.userId)}>{u.name || u.email}</button>
-                    ))}
+                <label>Recipient Subject (Email Address)</label>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <input 
+                    type="email" 
+                    placeholder="recipient@organization.edu" 
+                    value={recipientEmail} 
+                    onChange={(e) => setRecipientEmail(e.target.value)} 
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleLookupRecipient(); } }}
+                    required 
+                  />
+                  <button 
+                    type="button" 
+                    className="action-btn secondary text-xs" 
+                    onClick={() => handleLookupRecipient()} 
+                    disabled={lookupLoading}
+                    style={{ whiteSpace: 'nowrap' }}
+                  >
+                    {lookupLoading ? 'Looking up...' : 'Find User'}
+                  </button>
+                </div>
+
+                {/* Recipient lookup status */}
+                {lookupSearched && !recipientData && !lookupLoading && (
+                  <div className="alert-banner warning" style={{ marginTop: '0.5rem', padding: '0.5rem 0.75rem', fontSize: '0.8rem' }}>
+                    <AlertTriangle size={14} />
+                    <span>No registered user found with email "{recipientEmail}". Please verify the email address.</span>
                   </div>
                 )}
-                <span className="text-muted text-xs">The verified user ID representing the credential recipient.</span>
-              </div>
-              <div className="form-group">
-                <label>Document Artifact ID</label>
-                <input type="text" placeholder="doc_0123456789abcdef" value={documentId} onChange={(e) => setDocumentId(e.target.value)} required />
-                {availableDocs.length > 0 && (
-                  <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap", marginTop: "0.4rem" }}>
-                    <span className="text-muted text-xs" style={{ alignSelf: "center" }}>Recent uploads:</span>
-                    {availableDocs.slice(0, 2).map((d) => (
-                      <button type="button" key={d.documentId} className="persona-pill text-xs" style={{ padding: "2px 8px", fontSize: "0.72rem", cursor: "pointer" }} onClick={() => setDocumentId(d.documentId)}>{d.originalFilename ? `${d.originalFilename.slice(0, 16)}...` : d.documentId}</button>
-                    ))}
+
+                {recipientData && (
+                  <div style={{ marginTop: '0.5rem', padding: '0.6rem 0.75rem', background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.3)', borderRadius: 'var(--radius-md)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div>
+                        <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--emerald-primary, #10b981)' }}>✓ User Found: {recipientData.name}</span>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '0.5rem' }}>({recipientData.email})</span>
+                      </div>
+                      <span className="code-snippet text-xs">{recipientData.userId}</span>
+                    </div>
                   </div>
                 )}
-                <span className="text-muted text-xs">Artifact ID from document upload representing the source document.</span>
               </div>
+
+              <div className="form-group">
+                <label>Recipient User ID</label>
+                <input 
+                  type="text" 
+                  placeholder="usr_0123456789abcdef" 
+                  value={recipientId} 
+                  onChange={(e) => setRecipientId(e.target.value)} 
+                  required 
+                />
+                <span className="text-muted text-xs">Auto-populated from recipient email or entered manually.</span>
+              </div>
+
+              {/* Recipient Uploads / Document Attachment */}
+              <div className="form-group">
+                <label>Document Artifact to Attach</label>
+                <input 
+                  type="text" 
+                  placeholder="doc_0123456789abcdef" 
+                  value={documentId} 
+                  onChange={(e) => setDocumentId(e.target.value)} 
+                  required 
+                />
+
+                {recipientDocs.length > 0 && (
+                  <div style={{ marginTop: '0.6rem' }}>
+                    <span className="text-muted text-xs" style={{ fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
+                      Recipient's Uploaded Documents ({recipientDocs.length}):
+                    </span>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '180px', overflowY: 'auto' }}>
+                      {recipientDocs.map((doc) => {
+                        const isSelected = documentId === doc.documentId;
+                        return (
+                          <div 
+                            key={doc.documentId}
+                            onClick={() => setDocumentId(doc.documentId)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.45rem 0.6rem',
+                              borderRadius: 'var(--radius-sm)',
+                              border: isSelected ? '1px solid var(--accent-cyan)' : '1px solid var(--border-subtle)',
+                              background: isSelected ? 'rgba(0, 240, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                              cursor: 'pointer',
+                              fontSize: '0.78rem'
+                            }}
+                          >
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: '0.5rem' }}>
+                              <strong>{doc.originalFilename}</strong>
+                              <span className="text-muted text-xs" style={{ marginLeft: '0.5rem' }}>
+                                ({doc.mimeType?.split('/')[1] || 'doc'}, {(doc.fileSize / 1024).toFixed(1)} KB) · {new Date(doc.createdAt).toLocaleDateString()}
+                              </span>
+                              <div className="code-snippet hash-text text-xs" style={{ marginTop: '2px' }}>
+                                SHA256: {doc.sha256Hash?.slice(0, 20)}...
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              className={`action-btn ${isSelected ? 'primary' : 'secondary'} text-xs`}
+                              style={{ padding: '2px 8px', fontSize: '0.7rem', flexShrink: 0 }}
+                              onClick={(e) => { e.stopPropagation(); setDocumentId(doc.documentId); }}
+                            >
+                              {isSelected ? 'Selected' : 'Attach'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+                <span className="text-muted text-xs" style={{ marginTop: '0.3rem', display: 'block' }}>
+                  Artifact ID of the document to be cryptographically bound into the credential hash.
+                </span>
+              </div>
+
               <div className="form-row-2">
                 <div className="form-group">
                   <label>Credential Type</label>

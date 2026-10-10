@@ -44,6 +44,11 @@ const IssuerKeySchema = new mongoose.Schema({
     type: Date,
     default: Date.now
   },
+  expiresAt: {
+    type: Date,
+    default: () => new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+    index: true
+  },
   retiredAt: {
     type: Date,
     default: null

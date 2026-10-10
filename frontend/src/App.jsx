@@ -123,12 +123,54 @@ export function AppRoutes() {
           </ProtectedRoute>
         }
       >
-        <Route path="/dashboard" element={<PageWrapper Component={UserDashboard} />} />
-        <Route path="/upload" element={<PageWrapper Component={UploadDocument} />} />
-        <Route path="/verify" element={<PageWrapper Component={VerifyDocument} />} />
-        <Route path="/history" element={<PageWrapper Component={VerificationHistory} />} />
-        <Route path="/credentials" element={<PageWrapper Component={MyCredentials} />} />
-        <Route path="/analysis" element={<PageWrapper Component={DocumentAnalysis} />} />
+        <Route
+          path="/dashboard"
+          element={
+            <RoleRoute allowedRoles={['ADMIN', 'USER', 'ISSUER', 'HR', 'AUDITOR']}>
+              <PageWrapper Component={UserDashboard} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/upload"
+          element={
+            <RoleRoute allowedRoles={['ADMIN', 'USER']}>
+              <PageWrapper Component={UploadDocument} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/verify"
+          element={
+            <RoleRoute allowedRoles={['ADMIN', 'HR', 'USER']}>
+              <PageWrapper Component={VerifyDocument} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/history"
+          element={
+            <RoleRoute allowedRoles={['ADMIN', 'USER', 'HR']}>
+              <PageWrapper Component={VerificationHistory} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/credentials"
+          element={
+            <RoleRoute allowedRoles={['ADMIN', 'USER']}>
+              <PageWrapper Component={MyCredentials} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/analysis"
+          element={
+            <RoleRoute allowedRoles={['ADMIN', 'USER']}>
+              <PageWrapper Component={DocumentAnalysis} />
+            </RoleRoute>
+          }
+        />
 
         {/* Issuer Protected Routes */}
         <Route
@@ -183,8 +225,22 @@ export function AppRoutes() {
             </RoleRoute>
           }
         />
-        <Route path="/audit/evidence" element={<PageWrapper Component={VerificationEvidence} />} />
-        <Route path="/audit/chain" element={<PageWrapper Component={AuditChainValidation} />} />
+        <Route
+          path="/audit/evidence"
+          element={
+            <RoleRoute allowedRoles={['ADMIN', 'AUDITOR']}>
+              <PageWrapper Component={VerificationEvidence} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/audit/chain"
+          element={
+            <RoleRoute allowedRoles={['ADMIN', 'AUDITOR']}>
+              <PageWrapper Component={AuditChainValidation} />
+            </RoleRoute>
+          }
+        />
 
         {/* Administration Routes */}
         <Route

@@ -506,26 +506,192 @@ textarea:focus {
 }
 
 /* ─── 9. NOTIFICATION DRAWER & MODALS ─── */
-.notification-drawer {
-  background: var(--bg-card) !important;
-  backdrop-filter: blur(24px) !important;
-  -webkit-backdrop-filter: blur(24px) !important;
-  border-left: 1px solid var(--border-accent) !important;
-  box-shadow: var(--shadow-xl) !important;
+.drawer-overlay {
+  background: var(--bg-overlay) !important;
+  backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+  z-index: var(--z-drawer) !important;
 }
 
-.modal-dialog {
+.drawer-panel,
+.notification-drawer {
+  background: var(--bg-surface) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
+  border-left: 1px solid var(--border-strong) !important;
+  box-shadow: var(--shadow-xl), -8px 0 32px rgba(0, 0, 0, 0.5) !important;
+  color: var(--text-primary) !important;
+}
+
+.drawer-header {
+  background: var(--bg-surface) !important;
+  border-bottom: 1px solid var(--border-subtle) !important;
+}
+
+.drawer-title {
+  color: var(--text-primary) !important;
+}
+
+.drawer-title h3 {
+  color: var(--text-primary) !important;
+}
+
+.unread-pill {
+  background: var(--emerald-bg) !important;
+  border: 1px solid var(--emerald-border) !important;
+  color: var(--emerald-text) !important;
+  box-shadow: 0 0 10px var(--emerald-glow) !important;
+}
+
+.drawer-header .close-btn {
+  background: var(--bg-surface-elevated) !important;
+  border: 1px solid var(--border-subtle) !important;
+  color: var(--text-muted) !important;
+}
+
+.drawer-header .close-btn:hover {
+  background: var(--bg-card-hover) !important;
+  color: var(--text-primary) !important;
+  border-color: var(--border-strong) !important;
+}
+
+.drawer-content {
+  background: transparent !important;
+}
+
+.notif-item {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-card) !important;
+  color: var(--text-primary) !important;
+}
+
+.notif-item:hover {
+  background: var(--bg-card-hover) !important;
+  border-color: var(--border-accent) !important;
+  box-shadow: var(--shadow-md) !important;
+}
+
+.notif-item.notif-unread {
+  background: rgba(99, 102, 241, 0.1) !important;
+  border-color: var(--border-accent) !important;
+  border-left: 3px solid var(--accent-indigo) !important;
+  box-shadow: 0 2px 14px rgba(99, 102, 241, 0.14) !important;
+}
+
+.notif-item.notif-read {
+  opacity: 0.85 !important;
+  border-color: var(--border-subtle) !important;
+}
+
+.notif-title {
+  color: var(--text-primary) !important;
+}
+
+.notif-message {
+  color: var(--text-secondary) !important;
+}
+
+.notif-meta,
+.notif-time {
+  color: var(--text-muted) !important;
+}
+
+.notif-type {
+  background: var(--bg-surface-elevated) !important;
+  border: 1px solid var(--border-subtle) !important;
+  color: var(--text-muted) !important;
+}
+
+.unread-dot {
+  background: var(--accent-indigo-light) !important;
+  box-shadow: 0 0 8px var(--accent-indigo) !important;
+}
+
+.modal-dialog,
+.modal-container {
   background: var(--bg-card) !important;
   backdrop-filter: blur(24px) !important;
   -webkit-backdrop-filter: blur(24px) !important;
   border: 1px solid var(--border-accent) !important;
   box-shadow: var(--shadow-modal) !important;
   border-radius: var(--radius-xl) !important;
+  color: var(--text-primary) !important;
 }
 
-.modal-backdrop {
+.modal-backdrop,
+.modal-overlay {
   background: var(--bg-overlay) !important;
   backdrop-filter: blur(8px) !important;
+  -webkit-backdrop-filter: blur(8px) !important;
+}
+
+.modal-header {
+  border-bottom: 1px solid var(--border-subtle) !important;
+}
+
+/* Platform Showcase & Pricing Card Dark-Mode Theme Sync */
+.feature-preview-card {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-card) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+
+.feature-preview-card:hover {
+  background: var(--bg-card-hover) !important;
+  border-color: var(--border-accent) !important;
+  box-shadow: var(--shadow-card-hover) !important;
+}
+
+.trusted-by-wrapper {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-card) !important;
+}
+
+.trusted-partner-pill {
+  background: var(--bg-surface) !important;
+  border: 1px solid var(--border-subtle) !important;
+  color: var(--text-secondary) !important;
+}
+
+.trusted-partner-pill:hover {
+  background: var(--bg-surface-elevated) !important;
+  border-color: var(--border-strong) !important;
+  color: var(--text-primary) !important;
+}
+
+.pricing-card {
+  background: var(--bg-card) !important;
+  border: 1px solid var(--border-card) !important;
+  box-shadow: var(--shadow-card) !important;
+  color: var(--text-primary) !important;
+}
+
+.pricing-card:hover {
+  background: var(--bg-card-hover) !important;
+  border-color: var(--border-accent) !important;
+  box-shadow: var(--shadow-card-hover) !important;
+}
+
+.pricing-card.highlighted-teal {
+  background: linear-gradient(145deg, #0d9488 0%, #0f766e 100%) !important;
+  border: 1px solid var(--accent-teal) !important;
+  color: #ffffff !important;
+}
+
+.pricing-tier-tag {
+  color: var(--accent-indigo-light) !important;
+}
+
+.pricing-tier-tag.light-tag {
+  color: #ccfbf1 !important;
+}
+
+.pricing-card .pricing-features-list li {
+  color: var(--text-secondary) !important;
+}
+
+.pricing-card.highlighted-teal .pricing-features-list li {
+  color: #ffffff !important;
 }
 
 /* ─── 10. SPECIAL USER PAGE ANIMATIONS (Upload Dropzone, Dashboard, Credentials) ─── */

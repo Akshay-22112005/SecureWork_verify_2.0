@@ -15,14 +15,15 @@ import {
   Link2, 
   FileBadge, 
   CheckSquare, 
-  ExternalLink,
+  ExternalLink, 
   GitCommit,
   X
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
+import { hasRouteAccess } from '../config/permissions';
 
 export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMobile }) {
-  const { role, isAdmin, isAuditor, isIssuer, isHr, isUser } = useAuth();
+  const { role, isAdmin } = useAuth();
   const location = useLocation();
   const currentPath = location?.pathname || '';
 
@@ -64,15 +65,14 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
   // Navigation schema organized by category
   const navSections = [
     {
-      title: 'General',
+      title: 'Overview',
       items: [
-        { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'verify_document', path: '/verify', label: 'Public Verification', icon: ShieldCheck }
+        { id: 'dashboard', path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }
       ]
     },
     {
       title: 'User / Credential Holder',
-      visible: isUser || isAdmin,
+      visible: role === 'USER' || isAdmin,
       items: [
         { id: 'upload_document', path: '/upload', label: 'Upload Document', icon: UploadCloud },
         { id: 'my_credentials', path: '/credentials', label: 'My Credentials', icon: Award },
@@ -82,7 +82,7 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
     },
     {
       title: 'Issuer Management',
-      visible: isIssuer || isAdmin,
+      visible: role === 'ISSUER' || isAdmin,
       items: [
         { id: 'issuer_status', path: '/issuer/status', label: 'Issuer Status', icon: FileBadge },
         { id: 'issue_credential', path: '/credentials/issue', label: 'Issue Credential', icon: Award },
@@ -92,26 +92,25 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
     },
     {
       title: 'HR / Verifier',
-      visible: isHr || isAdmin,
+      visible: role === 'HR' || isAdmin,
       items: [
-        { id: 'hr_verify', path: '/verify', label: 'HR Verify Document', icon: ShieldCheck },
-        { id: 'verify_source', path: '/trusted-sources/verify', label: 'Verify Official Source', icon: ExternalLink },
-        { id: 'verification_evidence', path: '/audit/evidence', label: 'Verification Evidence', icon: CheckSquare },
-        { id: 'hr_history', path: '/history', label: 'Candidate Verification Logs', icon: History }
+        { id: 'hr_verify', path: '/verify', label: 'HR Verification', icon: ShieldCheck },
+        { id: 'hr_history', path: '/history', label: 'Verification History', icon: History },
+        { id: 'verify_source', path: '/trusted-sources/verify', label: 'Verify Official Source', icon: ExternalLink }
       ]
     },
     {
       title: 'Auditor & Compliance',
-      visible: isAuditor || isAdmin,
+      visible: role === 'AUDITOR' || isAdmin,
       items: [
-        { id: 'audit_logs', path: '/audit/logs', label: 'Hash-Chained Audit Logs', icon: History },
+        { id: 'audit_logs', path: '/audit/logs', label: 'Audit Logs', icon: History },
         { id: 'verification_evidence', path: '/audit/evidence', label: 'Verification Evidence', icon: CheckSquare },
         { id: 'chain_validation', path: '/audit/chain', label: 'Audit Chain Validation', icon: GitCommit }
       ]
     },
     {
       title: 'Administration',
-      visible: isAdmin,
+      visible: isAdmin || role === 'ADMIN',
       items: [
         { id: 'admin_users', path: '/admin/users', label: 'User Directory & RBAC', icon: Users },
         { id: 'admin_organizations', path: '/admin/organizations', label: 'Organizations & Trust', icon: Building },
@@ -121,6 +120,16 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
       ]
     }
   ];
+
+  // Filter sections and items based on permissions
+  const visibleSections = navSections
+    .filter((sec) => sec.visible !== false)
+    .map((sec) => ({
+      ...sec,
+      items: sec.items.filter((item) => hasRouteAccess(role, item.path))
+    }))
+    .filter((sec) => sec.items.length > 0);
+
 
   return (
     <>
@@ -147,9 +156,7 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
             </div>
           )}
 
-          {navSections
-            .filter((sec) => sec.visible !== false)
-            .map((sec) => (
+          {visibleSections.map((sec) => (
               <div key={sec.title} className="nav-section">
                 <div className="nav-section-title">{sec.title}</div>
                 <div className="nav-item-list">

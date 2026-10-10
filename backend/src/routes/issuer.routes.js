@@ -14,6 +14,9 @@ router.post('/register', issuerController.registerIssuer);
 // Issuer views own profile
 router.get('/me', issuerController.getMyIssuerProfile);
 
+// Recipient user and uploaded documents lookup (restricted to ADMIN, ISSUER)
+router.get('/recipients/lookup', requireRole('ADMIN', 'ISSUER'), issuerController.lookupRecipient);
+
 // Individual profile query
 router.get('/:id', issuerController.getIssuerById);
 
@@ -26,7 +29,7 @@ router.patch('/:id/suspend', requireRole('ADMIN'), issuerController.suspendIssue
 router.patch('/:id/revoke', requireRole('ADMIN'), issuerController.revokeIssuer);
 
 // Key Management endpoints
-router.post('/:id/keys', issuerKeyController.generateKey);
-router.post('/:id/rotate-key', issuerKeyController.rotateIssuerKey);
+router.post('/:id/keys', requireRole('ADMIN', 'ISSUER'), issuerKeyController.generateKey);
+router.post('/:id/rotate-key', requireRole('ADMIN', 'ISSUER'), issuerKeyController.rotateIssuerKey);
 
 module.exports = router;

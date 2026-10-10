@@ -1,6 +1,62 @@
 const ocrService = require('../services/ocr.service');
 const aiService = require('../services/ai.service');
+const documentService = require('../services/document.service');
 const { successResponse } = require('../utils/response');
+const { ValidationError } = require('../utils/errors');
+
+/**
+ * Upload document and immediately execute both OCR extraction and AI tamper analysis.
+ * (POST /api/analysis/upload)
+ */
+async function uploadAndAnalyze(req, res, next) {
+  try {
+    if (!req.file) {
+      throw new ValidationError('No document file uploaded');
+    }
+
+    // 1. Ingest document
+    const document = await documentService.ingestDocument(
+      {
+        file: req.file,
+        representationType: req.body.representationType || 'ORIGINAL_PDF'
+      },
+      req.user
+    );
+
+    // 2. Execute OCR analysis
+    let ocrAnalysis = null;
+    try {
+      ocrAnalysis = await ocrService.analyzeDocument(document.documentId, req.body.options || {}, req.user);
+    } catch (err) {
+      ocrAnalysis = { status: 'FAILED', errorReason: err.message };
+    }
+
+    // 3. Execute AI tamper analysis
+    let aiAnalysis = null;
+    try {
+      aiAnalysis = await aiService.analyzeDocument(document.documentId, req.body.options || {}, req.user);
+    } catch (err) {
+      aiAnalysis = { status: 'FAILED', errorReason: err.message };
+    }
+
+    return successResponse(
+      res,
+      {
+        document,
+        documentId: document.documentId,
+        ocrAnalysis,
+        aiAnalysis,
+        analysis: {
+          ocr: ocrAnalysis,
+          ai: aiAnalysis
+        }
+      },
+      201
+    );
+  } catch (err) {
+    next(err);
+  }
+}
 
 /**
  * Execute AI document analysis (POST /api/analysis/document).
@@ -48,17 +104,17 @@ async function getDocumentAnalysis(req, res, next) {
     } catch {}
 
     if (!aiAnalysis && !ocrAnalysis) {
-      // If neither exists, trigger not found
       await ocrService.getAnalysisByDocumentId(documentId);
     }
 
-    // Default primary analysis to AI if present, else OCR
-    const primary = aiAnalysis || ocrAnalysis;
+    const primary = ocrAnalysis || aiAnalysis;
     const responseData = {
       analysis: {
         ...primary,
         ai: aiAnalysis,
-        ocr: ocrAnalysis
+        ocr: ocrAnalysis,
+        ocrAnalysis,
+        aiAnalysis
       }
     };
 
@@ -69,6 +125,7 @@ async function getDocumentAnalysis(req, res, next) {
 }
 
 module.exports = {
+  uploadAndAnalyze,
   performDocumentAnalysis,
   performOcrAnalysis,
   getDocumentAnalysis

@@ -1,35 +1,38 @@
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Shield } from 'lucide-react';
+import LoadingScreen from './LoadingScreen';
 
 export default function ProtectedRoute({ children }) {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, sessionExpiredRef } = useAuth();
   const location = useLocation();
 
   if (loading) {
     return (
-      <div className="loading-screen">
-        <div className="crypto-loader-container">
-          <div className="crypto-loader-rings">
-            <div className="ring ring-outer"></div>
-            <div className="ring ring-middle"></div>
-            <div className="ring ring-inner"></div>
-            <div className="loader-core-icon">
-              <Shield size={34} />
-            </div>
-          </div>
-          <div className="crypto-loader-text">
-            <h3>SecureWork Verify</h3>
-            <p>Verifying Authentication Session...</p>
-          </div>
-        </div>
-      </div>
+      <LoadingScreen 
+        message="SecureWork Verify" 
+        submessage="Verifying cryptographic authentication session..." 
+      />
     );
   }
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    // Detect if this is a session expiry (token was there but is now invalid)
+    const isExpiry = Boolean(sessionExpiredRef?.current);
+    if (isExpiry) {
+      sessionExpiredRef.current = false; // Reset so it doesn't show again
+    }
+
+    return (
+      <Navigate
+        to="/login"
+        state={{
+          from: location,
+          sessionExpired: isExpiry || undefined
+        }}
+        replace
+      />
+    );
   }
 
   return children;

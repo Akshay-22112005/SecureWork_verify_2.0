@@ -539,6 +539,16 @@
   line-height: 1.65;
 }
 
+.feature-card-desc code {
+  background: var(--bg-surface-elevated);
+  color: var(--accent-cyan-light);
+  border: 1px solid var(--border-subtle);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+
 /* ─── 7. SECURITY PRINCIPLES ─── */
 .security-principles-grid {
   display: grid;

@@ -1,67 +1,115 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { setSessionExpiredHandler } from '../services/client';
 
 const AuthContext = createContext(null);
 
+/**
+ * Reads token from sessionStorage first (non-persistent), then localStorage (persistent).
+ */
+function readStoredToken() {
+  const sessionToken = sessionStorage.getItem('securework_token');
+  if (sessionToken && sessionToken !== 'null' && sessionToken !== 'undefined') {
+    return sessionToken;
+  }
+  const localToken = localStorage.getItem('securework_token');
+  if (localToken && localToken !== 'null' && localToken !== 'undefined') {
+    return localToken;
+  }
+  return null;
+}
+
+function clearAllStorage() {
+  localStorage.removeItem('securework_token');
+  localStorage.removeItem('securework_user');
+  sessionStorage.removeItem('securework_token');
+  sessionStorage.removeItem('securework_user');
+}
+
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(() => {
-    try {
-      const saved = localStorage.getItem('securework_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-  const [token, setToken] = useState(() => {
-    const saved = localStorage.getItem('securework_token');
-    return (saved && saved !== 'null' && saved !== 'undefined') ? saved : null;
-  });
+  // Start with loading=true, user=null (do NOT trust localStorage as auth proof)
+  const [user, setUser] = useState(null);
+  const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
+
+  // Track whether session expired for redirect message
+  const sessionExpiredRef = useRef(false);
 
   // Register 401 session expiry hook
   useEffect(() => {
     setSessionExpiredHandler(() => {
+      sessionExpiredRef.current = true;
       setUser(null);
       setToken(null);
-      localStorage.removeItem('securework_token');
-      localStorage.removeItem('securework_user');
+      clearAllStorage();
     });
   }, []);
 
-  // Fetch current user details on mount if token exists
+  // On mount: validate stored token with server (do NOT trust localStorage alone)
   useEffect(() => {
-    async function loadMe() {
-      if (!token || token === 'null' || token === 'undefined') {
-        setLoading(false);
+    let cancelled = false;
+    async function validateSession() {
+      const storedToken = readStoredToken();
+
+      if (!storedToken) {
+        if (!cancelled) setLoading(false);
         return;
       }
+
+      // Temporarily set token in state so apiClient can include it
+      if (!cancelled) setToken(storedToken);
+
       try {
         const res = await api.auth.getMe();
-        if (res && res.success) {
-          setUser(res.data.user);
-          localStorage.setItem('securework_user', JSON.stringify(res.data.user));
+        if (!cancelled) {
+          if (res && res.success) {
+            setUser(res.data.user);
+          } else {
+            clearAllStorage();
+            setUser(null);
+            setToken(null);
+          }
         }
       } catch (err) {
-        console.warn('Session verification failed, logging out', err);
-        logout();
+        console.warn('Session validation failed, clearing session', err);
+        if (!cancelled) {
+          clearAllStorage();
+          setUser(null);
+          setToken(null);
+        }
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
-    loadMe();
-  }, [token]);
+    validateSession();
+    return () => { cancelled = true; };
+  }, []);
 
-  async function login(email, password) {
+  /**
+   * login(email, password, rememberMe)
+   * rememberMe=true  -> localStorage (persistent across sessions)
+   * rememberMe=false -> sessionStorage (cleared when tab/browser closes)
+   */
+  async function login(email, password, rememberMe = false) {
     setAuthError(null);
     const res = await api.auth.login({ email, password });
     if (res && res.success) {
       const { user: loggedInUser, token: authToken } = res.data;
       setUser(loggedInUser);
       setToken(authToken);
-      localStorage.setItem('securework_token', authToken);
-      localStorage.setItem('securework_user', JSON.stringify(loggedInUser));
+
+      if (rememberMe) {
+        localStorage.setItem('securework_token', authToken);
+        localStorage.setItem('securework_user', JSON.stringify(loggedInUser));
+        sessionStorage.removeItem('securework_token');
+        sessionStorage.removeItem('securework_user');
+      } else {
+        sessionStorage.setItem('securework_token', authToken);
+        sessionStorage.setItem('securework_user', JSON.stringify(loggedInUser));
+        localStorage.removeItem('securework_token');
+        localStorage.removeItem('securework_user');
+      }
       return loggedInUser;
     }
     throw new Error(res?.error?.message || 'Login failed');
@@ -74,8 +122,11 @@ export function AuthProvider({ children }) {
       const { user: registeredUser, token: authToken } = res.data;
       setUser(registeredUser);
       setToken(authToken);
-      localStorage.setItem('securework_token', authToken);
-      localStorage.setItem('securework_user', JSON.stringify(registeredUser));
+      // Registration defaults to session storage (non-persistent) for security
+      sessionStorage.setItem('securework_token', authToken);
+      sessionStorage.setItem('securework_user', JSON.stringify(registeredUser));
+      localStorage.removeItem('securework_token');
+      localStorage.removeItem('securework_user');
       return registeredUser;
     }
     throw new Error(res?.error?.message || 'Registration failed');
@@ -84,12 +135,12 @@ export function AuthProvider({ children }) {
   function logout() {
     setUser(null);
     setToken(null);
-    localStorage.removeItem('securework_token');
-    localStorage.removeItem('securework_user');
+    clearAllStorage();
   }
 
   const role = user?.role || 'GUEST';
-  const isAuthenticated = Boolean(user && token);
+  // isAuthenticated is only true once loading completes AND user+token are valid
+  const isAuthenticated = !loading && Boolean(user && token);
   const isAdmin = role === 'ADMIN';
   const isAuditor = role === 'AUDITOR';
   const isIssuer = role === 'ISSUER';
@@ -113,7 +164,8 @@ export function AuthProvider({ children }) {
         isAuditor,
         isIssuer,
         isHr,
-        isUser
+        isUser,
+        sessionExpiredRef
       }}
     >
       {children}

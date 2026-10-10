@@ -1,53 +1,146 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   ShieldCheck, 
   Award, 
   QrCode, 
   Key, 
-  CheckCircle2, 
   Check, 
-  FileCheck, 
-  Lock, 
-  Sparkles,
   Cpu
 } from 'lucide-react';
+import { animate } from 'animejs';
+import { useReducedMotion } from '../hooks/useReducedMotion';
 
 export default function HeroVisualAnimation() {
-  const [scanStep, setScanStep] = useState(0);
+  const containerRef = useRef(null);
+  const cardRef = useRef(null);
+  const geo1Ref = useRef(null);
+  const geo2Ref = useRef(null);
+  const geo3Ref = useRef(null);
+  const laserRef = useRef(null);
+  const animInstancesRef = useRef([]);
+  const prefersReducedMotion = useReducedMotion();
 
-  // Cycling verification animation states (Simulating real-time verification loop)
   useEffect(() => {
-    const interval = setInterval(() => {
-      setScanStep((prev) => (prev + 1) % 3);
-    }, 3800);
-    return () => clearInterval(interval);
-  }, []);
+    if (prefersReducedMotion || !containerRef.current) return;
+
+    animInstancesRef.current.forEach((a) => {
+      if (a && typeof a.cancel === 'function') a.cancel();
+    });
+    animInstancesRef.current = [];
+
+    try {
+      // 1. Floating Holographic Card gentle bobbing
+      if (cardRef.current) {
+        const cardAnim = animate(cardRef.current, {
+          translateY: [0, -8, 0],
+          duration: 5400,
+          loop: true,
+          ease: 'inOutSine'
+        });
+        animInstancesRef.current.push(cardAnim);
+      }
+
+      // 2. Geometric Shape 1 (Key tile)
+      if (geo1Ref.current) {
+        const g1Anim = animate(geo1Ref.current, {
+          translateY: [0, -18, 0],
+          translateX: [0, 8, 0],
+          rotate: [0, 8, 0],
+          duration: 6800,
+          loop: true,
+          ease: 'inOutSine'
+        });
+        animInstancesRef.current.push(g1Anim);
+      }
+
+      // 3. Geometric Shape 2 (Shield tile)
+      if (geo2Ref.current) {
+        const g2Anim = animate(geo2Ref.current, {
+          translateY: [0, 16, 0],
+          translateX: [0, -10, 0],
+          rotate: [0, -7, 0],
+          duration: 7600,
+          loop: true,
+          ease: 'inOutSine'
+        });
+        animInstancesRef.current.push(g2Anim);
+      }
+
+      // 4. Geometric Shape 3 (Award tile)
+      if (geo3Ref.current) {
+        const g3Anim = animate(geo3Ref.current, {
+          translateY: [0, -14, 0],
+          translateX: [0, -12, 0],
+          rotate: [25, 34, 25],
+          duration: 8200,
+          loop: true,
+          ease: 'inOutSine'
+        });
+        animInstancesRef.current.push(g3Anim);
+      }
+
+      // 5. Hologram Laser Scanner
+      if (laserRef.current) {
+        const laserAnim = animate(laserRef.current, {
+          top: ['0%', '96%', '0%'],
+          opacity: [0, 1, 0],
+          duration: 3200,
+          loop: true,
+          ease: 'inOutQuad'
+        });
+        animInstancesRef.current.push(laserAnim);
+      }
+    } catch (e) {
+      // Graceful fallback
+    }
+
+    // Pause when tab hidden
+    function handleVisibility() {
+      const isHidden = document.visibilityState === 'hidden';
+      animInstancesRef.current.forEach((anim) => {
+        if (anim) {
+          if (isHidden && typeof anim.pause === 'function') anim.pause();
+          else if (!isHidden && typeof anim.play === 'function') anim.play();
+        }
+      });
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+      animInstancesRef.current.forEach((a) => {
+        if (a && typeof a.cancel === 'function') a.cancel();
+      });
+      animInstancesRef.current = [];
+    };
+  }, [prefersReducedMotion]);
 
   return (
-    <div className="hero-visual-wrapper">
+    <div ref={containerRef} className="hero-visual-wrapper">
       {/* Floating Geometric Shapes (Anime.js inspired playful floating physics) */}
-      <div className="geo-shape geo-shape-1 animate-float-slow" aria-hidden="true">
+      <div ref={geo1Ref} className="geo-shape geo-shape-1" aria-hidden="true">
         <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent-indigo)' }}>
           <Key size={26} />
         </div>
       </div>
 
-      <div className="geo-shape geo-shape-2 animate-float-reverse" aria-hidden="true">
+      <div ref={geo2Ref} className="geo-shape geo-shape-2" aria-hidden="true">
         <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--emerald-primary)' }}>
           <ShieldCheck size={24} />
         </div>
       </div>
 
-      <div className="geo-shape geo-shape-3 animate-float-drift" aria-hidden="true">
+      <div ref={geo3Ref} className="geo-shape geo-shape-3" aria-hidden="true">
         <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--amber-primary)' }}>
           <Award size={30} />
         </div>
       </div>
 
       {/* Holographic Digital Trust Credential Card */}
-      <div className="holo-credential-card animate-fade-in-up">
+      <div ref={cardRef} className="holo-credential-card animate-fade-in-up">
         {/* Animated Laser Scanning Beam */}
-        <div className="holo-scan-laser animate-scan-beam" />
+        <div ref={laserRef} className="holo-scan-laser" />
 
         {/* Card Header */}
         <div className="holo-card-header">
@@ -143,3 +236,4 @@ export default function HeroVisualAnimation() {
     </div>
   );
 }
+

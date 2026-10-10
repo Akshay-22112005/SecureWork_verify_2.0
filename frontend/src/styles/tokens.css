@@ -124,6 +124,10 @@
   --accent-teal: #14b8a6;
   --accent-blue: #3b82f6;
   --accent-purple: #a855f7;
+  --accent-emerald: #10b981;
+  --accent-emerald-light: #34d399;
+  --accent-amber: #f59e0b;
+  --accent-red: #ef4444;
 
   /* Verification Semantic States */
   /* VALID / Emerald */
@@ -233,6 +237,10 @@
   --accent-teal: #0d9488;
   --accent-blue: #2563eb;
   --accent-purple: #9333ea;
+  --accent-emerald: #059669;
+  --accent-emerald-light: #10b981;
+  --accent-amber: #d97706;
+  --accent-red: #dc2626;
 
   /* Verification Semantic States */
   /* VALID / Emerald */

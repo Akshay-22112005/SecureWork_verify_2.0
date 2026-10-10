@@ -2,21 +2,25 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useLocation } from 'react-router-dom';
 import { 
   ShieldCheck, Search, AlertCircle, RefreshCw, CheckCircle2, ShieldAlert,
-  Download, FileText, QrCode, Globe, ShieldX, Key, Hash, Award, CheckSquare, Zap, Copy, ExternalLink
+  Download, FileText, QrCode, Globe, ShieldX, Key, Hash, Award, CheckSquare, Zap, Copy, ExternalLink,
+  User, Building, Clock, Check
 } from 'lucide-react';
 import api from '../services/api';
 import TrustEvidenceCard from '../components/TrustEvidenceCard';
 import StatusBadge from '../components/StatusBadge';
+import ConfidenceRing from '../components/ConfidenceRing';
 import { useAuth } from '../context/AuthContext';
 
 export default function VerifyDocument({ initialParams = {}, onNavigate }) {
   const { user, isAdmin, isAuditor, isHr, role } = useAuth();
+  const isHrMode = isHr || role === 'HR';
   const routeParams = useParams();
   const location = useLocation();
   const initialCred = routeParams?.credentialId || location?.state?.credentialId || initialParams?.credentialId || '';
   const initialDocHash = location?.state?.documentHash || initialParams?.documentHash || '';
   const initialDocId = location?.state?.documentId || initialParams?.documentId || '';
 
+  const [activeTab, setActiveTab] = useState(isHrMode ? 'hr_candidate' : 'direct');
   const [credentialId, setCredentialId] = useState(initialCred);
   const [documentHash, setDocumentHash] = useState(initialDocHash);
   const [documentId, setDocumentId] = useState(initialDocId);
@@ -29,11 +33,71 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
   const [tamperLoading, setTamperLoading] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  // HR Candidate Lookup State
+  const [hrSubjectQuery, setHrSubjectQuery] = useState(initialParams.subjectIdOrEmail || '');
+  const [hrLoading, setHrLoading] = useState(false);
+  const [hrError, setHrError] = useState('');
+  const [hrSubjectData, setHrSubjectData] = useState(null);
+  const [hrCredentials, setHrCredentials] = useState([]);
+  const [hrSelectedCred, setHrSelectedCred] = useState(null);
+  const [hrSearched, setHrSearched] = useState(false);
+
   // Manual review fields
   const [reviewNotes, setReviewNotes] = useState('');
   const [reviewDecision, setReviewDecision] = useState('CONFIRMED');
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewMessage, setReviewMessage] = useState('');
+
+  // HR Candidate Lookup Handler
+  async function handleHrCandidateLookup(e) {
+    if (e) e.preventDefault();
+    if (!hrSubjectQuery || !hrSubjectQuery.trim()) {
+      setHrError('Please enter a User ID or Candidate Email address.');
+      return;
+    }
+    setHrError('');
+    setHrLoading(true);
+    setHrSearched(true);
+    setHrSubjectData(null);
+    setHrCredentials([]);
+    setHrSelectedCred(null);
+
+    try {
+      const res = await api.hr.getSubjectCredentials(hrSubjectQuery.trim());
+      if (res && res.success) {
+        setHrSubjectData(res.data.subject);
+        setHrCredentials(res.data.credentials || []);
+      } else {
+        setHrError(res?.error?.message || 'Candidate lookup failed');
+      }
+    } catch (err) {
+      setHrError(err.message || 'Candidate user not found or lookup failed');
+    } finally {
+      setHrLoading(false);
+    }
+  }
+
+  // HR Execute Verification on a Specific Subject Credential
+  async function handleHrVerifyCredential(cred) {
+    setHrSelectedCred(cred);
+    setCredentialId(cred.credentialId);
+    setLoading(true);
+    setError('');
+    try {
+      const res = await api.hr.verify({
+        credentialId: cred.credentialId,
+        subjectIdOrEmail: hrSubjectData?.userId || hrSubjectQuery.trim()
+      });
+      if (res && res.success) {
+        setVerificationResult(res.data);
+      }
+    } catch (err) {
+      setError(err.message || 'HR verification evaluation failed');
+    } finally {
+      setLoading(false);
+    }
+  }
+
 
   // Load candidate credentials for quick selection
   useEffect(() => {
@@ -179,94 +243,301 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
 
       <div className="page-header">
         <div>
-          <h2>Public Cryptographic Verification Portal</h2>
+          <h2>{isHrMode ? 'HR & Candidate Verification Portal' : 'Public Cryptographic Verification Portal'}</h2>
           <p className="page-subtitle">
-            Zero-trust verification engine • Validates Ed25519 digital signatures, RFC 8785 canonicalization, and tamper-evident audit-chain continuity without vendor lock-in.
+            Zero-trust verification engine • Validates candidate claims, Ed25519 digital signatures, RFC 8785 canonicalization, and tamper-evident audit-chain continuity.
           </p>
         </div>
-      </div>
-
-      {/* Verification Query Form */}
-      <div className="glass-card" style={{ marginBottom: '2rem' }}>
-        <h3>Verify Credential Target</h3>
-        <p className="text-secondary text-sm" style={{ marginBottom: '1.25rem' }}>
-          Select an active credential or paste a Credential ID or document SHA-256 hash.
-        </p>
-
-        {error && (
-          <div className="alert-banner danger" style={{ marginBottom: '1rem' }}>
-            <AlertCircle size={16} />
-            <span>{error}</span>
+        {(isHrMode || isAdmin) && (
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button 
+              type="button"
+              className={`action-btn ${activeTab === 'hr_candidate' ? 'primary' : 'secondary'} text-xs`}
+              onClick={() => setActiveTab('hr_candidate')}
+            >
+              <User size={13} /> Candidate Subject Lookup
+            </button>
+            <button 
+              type="button"
+              className={`action-btn ${activeTab === 'direct' ? 'primary' : 'secondary'} text-xs`}
+              onClick={() => setActiveTab('direct')}
+            >
+              <ShieldCheck size={13} /> Direct Credential / Hash
+            </button>
           </div>
         )}
+      </div>
 
-        <form onSubmit={handleVerify} className="form-grid-3">
-          {candidateCredentials.length > 0 && (
-            <div className="form-group" style={{ gridColumn: 'span 3', marginBottom: '0.5rem' }}>
-              <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Quick-Select Candidate Credential</span>
-                <span className="text-muted text-xs">Pre-loaded from accredited issuer registry</span>
-              </label>
-              <select
-                className="select-input"
-                value={credentialId}
-                onChange={(e) => {
-                  const targetId = e.target.value;
-                  setCredentialId(targetId);
-                  const selected = candidateCredentials.find(c => c.credentialId === targetId);
-                  if (selected && selected.currentVersion && selected.currentVersion.documentHash) {
-                    setDocumentHash(selected.currentVersion.documentHash);
-                  }
-                }}
-              >
-                <option value="">-- Select a Sample Credential or Enter Manually --</option>
-                {candidateCredentials.map((c) => (
-                  <option key={c.credentialId} value={c.credentialId}>
-                    {c.title} ({c.credentialId}) — [{c.status}]
-                  </option>
-                ))}
-              </select>
+      {/* ─── TAB 1: HR CANDIDATE LOOKUP FLOW ─── */}
+      {activeTab === 'hr_candidate' && (
+        <div style={{ marginBottom: '2rem' }}>
+          <div className="glass-card" style={{ marginBottom: '1.5rem' }}>
+            <h3>HR Candidate Subject Verification</h3>
+            <p className="text-secondary text-sm" style={{ marginBottom: '1.25rem' }}>
+              Enter a candidate's registered User ID or Email address to inspect all issued credentials and execute cryptographic proof evaluations.
+            </p>
+
+            {hrError && (
+              <div className="alert-banner danger" style={{ marginBottom: '1rem' }}>
+                <AlertCircle size={16} />
+                <span>{hrError}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleHrCandidateLookup} style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: '280px' }}>
+                <input
+                  type="text"
+                  placeholder="Candidate User ID (usr_...) or Email (scholar@stanford.edu)"
+                  value={hrSubjectQuery}
+                  onChange={(e) => setHrSubjectQuery(e.target.value)}
+                  required
+                />
+              </div>
+              <button type="submit" className="action-btn primary" disabled={hrLoading}>
+                <Search size={15} />
+                {hrLoading ? 'Searching Candidate...' : 'Look Up Candidate'}
+              </button>
+            </form>
+          </div>
+
+          {/* Candidate Profile Summary */}
+          {hrSubjectData && (
+            <div className="glass-card" style={{ marginBottom: '1.5rem', border: '1px solid rgba(0, 240, 255, 0.25)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '50%', background: 'var(--gradient-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700 }}>
+                    {hrSubjectData.name?.charAt(0) || 'C'}
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '1.15rem' }}>{hrSubjectData.name}</h3>
+                    <div className="text-secondary text-xs" style={{ display: 'flex', gap: '0.6rem', marginTop: '0.2rem' }}>
+                      <span>{hrSubjectData.email}</span>
+                      <span>·</span>
+                      <span className="code-snippet text-xs">{hrSubjectData.userId}</span>
+                    </div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                  <span className="badge-tag">Status: {hrSubjectData.status}</span>
+                  <span className="text-muted text-xs">Joined {new Date(hrSubjectData.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
             </div>
           )}
 
-          <div className="form-group">
-            <label>Credential ID</label>
-            <input
-              type="text"
-              placeholder="crd_0123456789abcdef"
-              value={credentialId}
-              onChange={(e) => setCredentialId(e.target.value)}
-            />
-          </div>
+          {/* Candidate Credentials List */}
+          {hrSubjectData && (
+            <div style={{ marginBottom: '1.5rem' }}>
+              <div className="section-header">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <Award size={18} className="text-cyan" />
+                  <h3>Candidate Issued Credentials ({hrCredentials.length})</h3>
+                </div>
+                <span className="text-muted text-xs">All workforce credentials attached to this candidate</span>
+              </div>
 
-          <div className="form-group">
-            <label>Document SHA-256 Hash</label>
-            <input
-              type="text"
-              placeholder="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
-              value={documentHash}
-              onChange={(e) => setDocumentHash(e.target.value)}
-            />
-          </div>
+              {hrCredentials.length === 0 ? (
+                <div className="glass-card empty-state">
+                  <Award size={36} style={{ opacity: 0.3, marginBottom: '0.75rem' }} />
+                  <p>No workforce credentials have been issued to this candidate yet.</p>
+                </div>
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1rem' }}>
+                  {hrCredentials.map((cred) => {
+                    const isSelected = hrSelectedCred?.credentialId === cred.credentialId;
+                    return (
+                      <div 
+                        key={cred.credentialId}
+                        className="glass-card"
+                        style={{
+                          border: isSelected ? '2px solid var(--accent-cyan)' : '1px solid var(--border-subtle)',
+                          position: 'relative',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          justifyContent: 'space-between',
+                          padding: '1.25rem'
+                        }}
+                      >
+                        <div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.75rem' }}>
+                            <div>
+                              <span className="badge-tag" style={{ fontSize: '0.7rem', marginBottom: '0.35rem', display: 'inline-block' }}>
+                                {cred.credentialType}
+                              </span>
+                              <h4 style={{ margin: 0, fontSize: '1rem', color: '#fff' }}>{cred.title}</h4>
+                            </div>
+                            <StatusBadge status={cred.status} />
+                          </div>
 
-          <div className="form-group">
-            <label>Document Artifact ID (Optional)</label>
-            <input
-              type="text"
-              placeholder="doc_0123456789abcdef"
-              value={documentId}
-              onChange={(e) => setDocumentId(e.target.value)}
-            />
-          </div>
+                          <div className="detail-row" style={{ padding: '0.25rem 0' }}>
+                            <span className="detail-label" style={{ fontSize: '0.75rem' }}>Credential ID</span>
+                            <span className="code-snippet text-xs">{cred.credentialId}</span>
+                          </div>
 
-          <div className="form-submit-row" style={{ gridColumn: 'span 3', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
-            <button type="submit" className="action-btn primary" disabled={loading}>
-              <ShieldCheck size={16} />
-              {loading ? 'Evaluating Proofs...' : 'Verify Cryptographic Proofs'}
-            </button>
-          </div>
-        </form>
-      </div>
+                          <div className="detail-row" style={{ padding: '0.25rem 0' }}>
+                            <span className="detail-label" style={{ fontSize: '0.75rem' }}>Issuing Organization</span>
+                            <span style={{ fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <Building size={12} className="text-muted" />
+                              {cred.organization?.name || cred.issuer?.issuerName}
+                              {cred.organization?.isVerified && (
+                                <span style={{ color: '#10b981', display: 'inline-flex', alignItems: 'center' }} title="Verified Organization">
+                                  <Check size={13} />
+                                </span>
+                              )}
+                            </span>
+                          </div>
+
+                          <div className="detail-row" style={{ padding: '0.25rem 0' }}>
+                            <span className="detail-label" style={{ fontSize: '0.75rem' }}>Org Trust Status</span>
+                            <span className="badge-tag" style={{ fontSize: '0.7rem', color: cred.organization?.isVerified ? '#10b981' : 'var(--text-muted)' }}>
+                              {cred.organization?.verificationStatus || 'UNVERIFIED'}
+                            </span>
+                          </div>
+
+                          <div className="detail-row" style={{ padding: '0.25rem 0' }}>
+                            <span className="detail-label" style={{ fontSize: '0.75rem' }}>Key Status</span>
+                            <span className="badge-tag" style={{ fontSize: '0.7rem' }}>{cred.keyStatus}</span>
+                          </div>
+
+                          <div className="detail-row" style={{ padding: '0.25rem 0' }}>
+                            <span className="detail-label" style={{ fontSize: '0.75rem' }}>Digital Signature</span>
+                            <span style={{ fontSize: '0.8rem', color: cred.signatureValid ? '#10b981' : '#ef4444', fontWeight: 600 }}>
+                              {cred.signatureValid ? '✓ Valid (Ed25519)' : '✗ Invalid'}
+                            </span>
+                          </div>
+
+                          <div className="detail-row" style={{ padding: '0.25rem 0' }}>
+                            <span className="detail-label" style={{ fontSize: '0.75rem' }}>Dates</span>
+                            <span className="text-muted text-xs">
+                              Issued: {new Date(cred.issuedAt).toLocaleDateString()}
+                              {cred.expiresAt && ` · Exp: ${new Date(cred.expiresAt).toLocaleDateString()}`}
+                            </span>
+                          </div>
+
+                          {/* Trust Level Indicator */}
+                          <div style={{ marginTop: '0.75rem', padding: '0.5rem', background: 'rgba(255, 255, 255, 0.02)', borderRadius: 'var(--radius-sm)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
+                              <span className="text-muted">Trust Level:</span>
+                              <strong style={{ color: cred.trustLevel?.includes('LEVEL 5') ? '#10b981' : 'var(--accent-cyan)' }}>
+                                {cred.trustLevel}
+                              </strong>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ marginTop: '1rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)' }}>
+                          <button
+                            type="button"
+                            className="action-btn primary full-width text-xs"
+                            onClick={() => handleHrVerifyCredential(cred)}
+                            disabled={loading}
+                          >
+                            <ShieldCheck size={14} />
+                            {isSelected && verificationResult ? 'Re-Verify Proof Details' : 'Verify Full Evidence'}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Search performed with no match */}
+          {hrSearched && !hrSubjectData && !hrLoading && !hrError && (
+            <div className="glass-card empty-state">
+              <User size={36} style={{ opacity: 0.3, marginBottom: '0.75rem' }} />
+              <p>No registered candidate user found matching "{hrSubjectQuery}".</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ─── TAB 2: DIRECT VERIFICATION FORM (Always available or in direct tab) ─── */}
+      {activeTab === 'direct' && (
+        <div className="glass-card" style={{ marginBottom: '2rem' }}>
+          <h3>Verify Credential Target</h3>
+          <p className="text-secondary text-sm" style={{ marginBottom: '1.25rem' }}>
+            Select an active credential or paste a Credential ID or document SHA-256 hash.
+          </p>
+
+          {error && (
+            <div className="alert-banner danger" style={{ marginBottom: '1rem' }}>
+              <AlertCircle size={16} />
+              <span>{error}</span>
+            </div>
+          )}
+
+          <form onSubmit={handleVerify} className="form-grid-3">
+            {candidateCredentials.length > 0 && (
+              <div className="form-group" style={{ gridColumn: 'span 3', marginBottom: '0.5rem' }}>
+                <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Quick-Select Candidate Credential</span>
+                  <span className="text-muted text-xs">Pre-loaded from accredited issuer registry</span>
+                </label>
+                <select
+                  className="select-input"
+                  value={credentialId}
+                  onChange={(e) => {
+                    const targetId = e.target.value;
+                    setCredentialId(targetId);
+                    const selected = candidateCredentials.find(c => c.credentialId === targetId);
+                    if (selected && selected.currentVersion && selected.currentVersion.documentHash) {
+                      setDocumentHash(selected.currentVersion.documentHash);
+                    }
+                  }}
+                >
+                  <option value="">-- Select a Sample Credential or Enter Manually --</option>
+                  {candidateCredentials.map((c) => (
+                    <option key={c.credentialId} value={c.credentialId}>
+                      {c.title} ({c.credentialId}) — [{c.status}]
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="form-group">
+              <label>Credential ID</label>
+              <input
+                type="text"
+                placeholder="crd_0123456789abcdef"
+                value={credentialId}
+                onChange={(e) => setCredentialId(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Document SHA-256 Hash</label>
+              <input
+                type="text"
+                placeholder="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+                value={documentHash}
+                onChange={(e) => setDocumentHash(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label>Document Artifact ID (Optional)</label>
+              <input
+                type="text"
+                placeholder="doc_0123456789abcdef"
+                value={documentId}
+                onChange={(e) => setDocumentId(e.target.value)}
+              />
+            </div>
+
+            <div className="form-submit-row" style={{ gridColumn: 'span 3', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button type="submit" className="action-btn primary" disabled={loading}>
+                <ShieldCheck size={16} />
+                {loading ? 'Evaluating Proofs...' : 'Verify Cryptographic Proofs'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Recruiter / Employer Wow Verification Card */}
       {publicData && (

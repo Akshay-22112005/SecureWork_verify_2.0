@@ -110,5 +110,6 @@ async function optionalAuthenticateUser(req, res, next) {
 module.exports = {
   authenticateUser,
   optionalAuthenticateUser,
-  requireRole
+  requireRole,
+  authorize: requireRole
 };
