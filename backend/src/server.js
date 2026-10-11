@@ -28,6 +28,16 @@ async function startServer() {
   // Connect to database
   await connectDB();
 
+  // In development or when using in-memory database fallback, ensure admin and demo personas exist
+  if (env.IS_DEVELOPMENT) {
+    try {
+      const seedAdmin = require('./scripts/seedAdmin');
+      await seedAdmin({ disconnect: false });
+    } catch (seedErr) {
+      logger.warn(`Auto-seed skipped or non-fatal: ${seedErr.message}`);
+    }
+  }
+
   const server = app.listen(env.PORT, () => {
     logger.info(`SecureWork Verify Backend Service listening on port ${env.PORT}`, {
       environment: env.NODE_ENV,

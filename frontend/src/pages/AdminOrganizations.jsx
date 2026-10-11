@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Building, ShieldCheck, CheckCircle2, AlertTriangle, RefreshCw, Plus, X } from 'lucide-react';
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
@@ -11,6 +12,7 @@ export default function AdminOrganizations({ onNavigate }) {
   const [type, setType] = useState('UNIVERSITY');
   const [officialDomain, setOfficialDomain] = useState('');
   const [organizationCode, setOrganizationCode] = useState('');
+  const navigate = useNavigate();
 
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
@@ -173,7 +175,7 @@ export default function AdminOrganizations({ onNavigate }) {
             </thead>
             <tbody>
               {organizations.map((org) => (
-                <tr key={org.organizationId}>
+                <tr key={org.organizationId} onClick={(e) => { e.stopPropagation(); navigate(`/admin/organizations/${org.organizationId}`); }} style={{ cursor: 'pointer' }}>
                   <td className="code-snippet">{org.organizationId}</td>
                   <td><strong>{org.name}</strong></td>
                   <td><span className="badge-tag">{org.type}</span></td>
@@ -184,7 +186,7 @@ export default function AdminOrganizations({ onNavigate }) {
                       {org.organizationVerificationStatus !== 'VERIFIED' && org.organizationVerificationStatus !== 'REVOKED' && (
                         <button 
                           className="action-btn primary text-xs"
-                          onClick={() => handleVerify(org.organizationId)}
+                          onClick={(e) => { e.stopPropagation(); handleVerify(org.organizationId); }}
                           style={{ padding: '0.2rem 0.5rem' }}
                         >
                           Verify
@@ -193,7 +195,7 @@ export default function AdminOrganizations({ onNavigate }) {
                       {org.organizationVerificationStatus === 'VERIFIED' && (
                         <button 
                           className="action-btn secondary text-xs"
-                          onClick={() => handleSuspend(org.organizationId)}
+                          onClick={(e) => { e.stopPropagation(); handleSuspend(org.organizationId); }}
                           style={{ padding: '0.2rem 0.5rem' }}
                         >
                           Suspend
@@ -202,12 +204,13 @@ export default function AdminOrganizations({ onNavigate }) {
                       {org.organizationVerificationStatus !== 'REVOKED' && (
                         <button 
                           className="action-btn danger text-xs"
-                          onClick={() => handleRevoke(org.organizationId)}
+                          onClick={(e) => { e.stopPropagation(); handleRevoke(org.organizationId); }}
                           style={{ padding: '0.2rem 0.5rem' }}
                         >
                           Revoke
                         </button>
                       )}
+                        <button className="action-btn secondary text-xs" onClick={(e) => { e.stopPropagation(); navigate(`/admin/organizations/${org.organizationId}`); }} style={{ padding: '0.2rem 0.5rem' }}>Manage</button>
                     </div>
                   </td>
                 </tr>

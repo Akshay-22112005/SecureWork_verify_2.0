@@ -28,6 +28,7 @@ import KeyStatus from './pages/KeyStatus';
 import VerifyOfficialSource from './pages/VerifyOfficialSource';
 import AdminUsers from './pages/AdminUsers';
 import AdminOrganizations from './pages/AdminOrganizations';
+import AdminOrganizationDetail from './pages/AdminOrganizationDetail';
 import AdminTrustedSources from './pages/AdminTrustedSources';
 import AdminIssuers from './pages/AdminIssuers';
 import AdminSystemSettings from './pages/AdminSystemSettings';
@@ -256,6 +257,14 @@ export function AppRoutes() {
           element={
             <RoleRoute allowedRoles={['ADMIN']}>
               <PageWrapper Component={AdminOrganizations} />
+            </RoleRoute>
+          }
+        />
+        <Route
+          path="/admin/organizations/:organizationId"
+          element={
+            <RoleRoute allowedRoles={['ADMIN']}>
+              <PageWrapper Component={AdminOrganizationDetail} />
             </RoleRoute>
           }
         />

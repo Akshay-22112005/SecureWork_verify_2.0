@@ -47,22 +47,22 @@ export const CAPABILITIES = {
   MANAGE_KEYS: ['ADMIN', 'ISSUER'],
   VIEW_ALL_CREDENTIALS: ['ADMIN', 'ISSUER'],
   REVOKE_CREDENTIAL: ['ADMIN', 'ISSUER'],
-  
+
   // Document uploading & personal credential viewing
   UPLOAD_DOCUMENT: ['ADMIN', 'USER'],
   VIEW_OWN_CREDENTIALS: ['ADMIN', 'USER'],
   RUN_DOCUMENT_ANALYSIS: ['ADMIN', 'USER'],
-  
+
   // HR verification capabilities
   VERIFY_CANDIDATE: ['ADMIN', 'HR'],
   VERIFY_OFFICIAL_SOURCE: ['ADMIN', 'HR'],
   VIEW_VERIFICATION_HISTORY: ['ADMIN', 'HR', 'USER'],
-  
+
   // Auditor compliance capabilities (strictly read-only / validation)
   VIEW_AUDIT_LOGS: ['ADMIN', 'AUDITOR'],
   VIEW_VERIFICATION_EVIDENCE: ['ADMIN', 'AUDITOR'],
   VALIDATE_AUDIT_CHAIN: ['ADMIN', 'AUDITOR'],
-  
+
   // Admin governance capabilities
   MANAGE_USERS: ['ADMIN'],
   ASSIGN_ROLES: ['ADMIN'],
@@ -81,11 +81,11 @@ export const CAPABILITIES = {
 export function hasRouteAccess(role, path) {
   if (!role) return false;
   if (role === ROLES.ADMIN) return true;
-  
+
   // Find matching route pattern
   const normalizedPath = path.replace(/\/$/, '') || '/';
   const allowedRoles = ROUTE_PERMISSIONS[normalizedPath];
-  
+
   if (!allowedRoles) return false;
   return allowedRoles.includes(role);
 }
@@ -99,7 +99,7 @@ export function hasRouteAccess(role, path) {
 export function canPerform(role, capability) {
   if (!role) return false;
   if (role === ROLES.ADMIN) return true;
-  
+
   const allowed = CAPABILITIES[capability];
   if (!allowed) return false;
   return allowed.includes(role);
