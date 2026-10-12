@@ -138,7 +138,8 @@ export function AuthProvider({ children }) {
     clearAllStorage();
   }
 
-  const role = user?.role || 'GUEST';
+  // Organization MEMBER accounts use the baseline candidate/user capabilities.
+  const role = user?.role === 'MEMBER' ? 'USER' : (user?.role || 'GUEST');
   // isAuthenticated is only true once loading completes AND user+token are valid
   const isAuthenticated = !loading && Boolean(user && token);
   const isAdmin = role === 'ADMIN';

@@ -8,7 +8,8 @@ export const ROLES = {
   ISSUER: 'ISSUER',
   AUDITOR: 'AUDITOR',
   HR: 'HR',
-  USER: 'USER'
+  USER: 'USER',
+  MEMBER: 'MEMBER'
 };
 
 export const ROLE_HOME_PAGES = {
@@ -20,12 +21,12 @@ export const ROLE_HOME_PAGES = {
 };
 
 export const ROUTE_PERMISSIONS = {
-  '/dashboard': ['ADMIN', 'USER', 'ISSUER', 'HR', 'AUDITOR'],
-  '/upload': ['ADMIN', 'USER'],
-  '/credentials': ['ADMIN', 'USER'],
-  '/history': ['ADMIN', 'USER', 'HR'],
-  '/analysis': ['ADMIN', 'USER'],
-  '/verify': ['ADMIN', 'HR', 'USER'],
+  '/dashboard': ['ADMIN', 'USER', 'MEMBER', 'ISSUER', 'HR', 'AUDITOR'],
+  '/upload': ['ADMIN', 'USER', 'MEMBER'],
+  '/credentials': ['ADMIN', 'USER', 'MEMBER'],
+  '/history': ['ADMIN', 'USER', 'HR', 'MEMBER'],
+  '/analysis': ['ADMIN', 'USER', 'MEMBER'],
+  '/verify': ['ADMIN', 'HR', 'USER', 'MEMBER'],
   '/credentials/issue': ['ADMIN', 'ISSUER'],
   '/credentials/all': ['ADMIN', 'ISSUER'],
   '/issuer/status': ['ADMIN', 'ISSUER'],
@@ -49,14 +50,14 @@ export const CAPABILITIES = {
   REVOKE_CREDENTIAL: ['ADMIN', 'ISSUER'],
 
   // Document uploading & personal credential viewing
-  UPLOAD_DOCUMENT: ['ADMIN', 'USER'],
-  VIEW_OWN_CREDENTIALS: ['ADMIN', 'USER'],
-  RUN_DOCUMENT_ANALYSIS: ['ADMIN', 'USER'],
+  UPLOAD_DOCUMENT: ['ADMIN', 'USER', 'MEMBER'],
+  VIEW_OWN_CREDENTIALS: ['ADMIN', 'USER', 'MEMBER'],
+  RUN_DOCUMENT_ANALYSIS: ['ADMIN', 'USER', 'MEMBER'],
 
   // HR verification capabilities
   VERIFY_CANDIDATE: ['ADMIN', 'HR'],
   VERIFY_OFFICIAL_SOURCE: ['ADMIN', 'HR'],
-  VIEW_VERIFICATION_HISTORY: ['ADMIN', 'HR', 'USER'],
+  VIEW_VERIFICATION_HISTORY: ['ADMIN', 'HR', 'USER', 'MEMBER'],
 
   // Auditor compliance capabilities (strictly read-only / validation)
   VIEW_AUDIT_LOGS: ['ADMIN', 'AUDITOR'],

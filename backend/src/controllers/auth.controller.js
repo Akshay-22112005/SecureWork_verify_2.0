@@ -7,8 +7,8 @@ const { successResponse } = require('../utils/response');
  */
 async function register(req, res, next) {
   try {
-    const { name, email, password } = req.body;
-    const result = await authService.register({ name, email, password });
+    const { name, email, password, invitationToken } = req.body;
+    const result = await authService.register({ name, email, password, invitationToken });
     return successResponse(res, result, 201);
   } catch (err) {
     next(err);

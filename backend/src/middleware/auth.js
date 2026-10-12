@@ -43,6 +43,7 @@ async function authenticateUser(req, res, next) {
     }
 
     req.user = user.toJSON();
+    if (req.user.role === 'MEMBER') req.user.role = 'USER';
     next();
   } catch (err) {
     next(err);
@@ -97,6 +98,7 @@ async function optionalAuthenticateUser(req, res, next) {
       const user = await User.findOne({ userId });
       if (user && user.status === 'ACTIVE') {
         req.user = user.toJSON();
+        if (req.user.role === 'MEMBER') req.user.role = 'USER';
       }
     }
   } catch {

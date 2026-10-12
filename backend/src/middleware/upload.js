@@ -49,5 +49,6 @@ function handleDocumentUpload(req, res, next) {
 }
 
 module.exports = {
+  upload,
   handleDocumentUpload
 };

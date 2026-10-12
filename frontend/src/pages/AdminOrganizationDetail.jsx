@@ -22,6 +22,53 @@ import {
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 
+function parseOrganizationUserCsv(csv) {
+  const records = [];
+  let row = [];
+  let value = '';
+  let quoted = false;
+  for (let index = 0; index < csv.length; index += 1) {
+    const character = csv[index];
+    if (character === '"') {
+      if (quoted && csv[index + 1] === '"') {
+        value += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (character === ',' && !quoted) {
+      row.push(value);
+      value = '';
+    } else if ((character === '\n' || character === '\r') && !quoted) {
+      if (character === '\r' && csv[index + 1] === '\n') index += 1;
+      row.push(value);
+      if (row.some((cell) => cell.trim())) records.push(row);
+      row = [];
+      value = '';
+    } else {
+      value += character;
+    }
+  }
+  if (quoted) return { rows: [], error: 'CSV contains an unterminated quoted field.' };
+  row.push(value);
+  if (row.some((cell) => cell.trim())) records.push(row);
+  if (!records.length) return { rows: [], error: '' };
+
+  const headers = records[0].map((header, index) => (index === 0 ? header.replace(/^\uFEFF/, '') : header).trim().toLowerCase());
+  const nameIndex = headers.indexOf('name');
+  const emailIndex = headers.indexOf('email');
+  const roleIndex = headers.indexOf('role');
+  if (nameIndex < 0 || emailIndex < 0) return { rows: [], error: 'CSV headers must include name and email.' };
+  return {
+    rows: records.slice(1).map((cells) => ({
+      name: cells[nameIndex] || '',
+      email: cells[emailIndex] || '',
+      role: roleIndex >= 0 ? (cells[roleIndex] || 'ISSUER') : 'ISSUER'
+    })),
+    error: ''
+  };
+}
+
 export default function AdminOrganizationDetail({ onNavigate }) {
   const { organizationId } = useParams();
   const navigate = useNavigate();
@@ -46,6 +93,13 @@ export default function AdminOrganizationDetail({ onNavigate }) {
   const [unassignedUsers, setUnassignedUsers] = useState([]);
   const [searchingUnassignedUsers, setSearchingUnassignedUsers] = useState(false);
   const [assignUserError, setAssignUserError] = useState('');
+  const [inviteEmailNotFound, setInviteEmailNotFound] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [bulkCsvText, setBulkCsvText] = useState('');
+  const [bulkRows, setBulkRows] = useState([]);
+  const [bulkLoading, setBulkLoading] = useState(false);
+  const [bulkError, setBulkError] = useState('');
+  const [bulkSummary, setBulkSummary] = useState(null);
 
   // Associated resources
   const [issuers, setIssuers] = useState([]);
@@ -142,12 +196,20 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
       return;
     }
     setAssignUserError('');
+    setInviteEmailNotFound(false);
     setSearchingUnassignedUsers(true);
     try {
-      const res = await api.users.list({ email, organizationId: 'unassigned', limit: 100 });
+      const res = await api.admin.searchOrganizationUser(organization.organizationId, email);
       const result = res?.data || res;
-      setUnassignedUsers(result?.users || []);
-      if (!result?.users?.length) setAssignUserError('No unassigned users found for that email.');
+      if (!result?.found) {
+        setUnassignedUsers([]);
+        setInviteEmailNotFound(true);
+      } else if (!result.available) {
+        setUnassignedUsers([]);
+        setAssignUserError(result.message || 'This account is already assigned to another organization.');
+      } else {
+        setUnassignedUsers(result.user ? [result.user] : []);
+      }
     } catch (err) {
       setAssignUserError(err.message || 'Unable to search users.');
     } finally {
@@ -159,12 +221,32 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
     try {
       await api.admin.assignUserToOrganization(organization.organizationId, user.userId || user.id || user._id, assignUserRole);
       setMessage(`${user.name} was assigned to ${organization.name} as ${assignUserRole}.`);
-      setShowAssignUserModal(false);
-      setAssignUserEmail('');
-      setUnassignedUsers([]);
+      closeAssignUserModal();
       await fetchOrganizationUsers();
     } catch (err) {
       setAssignUserError(err.message || 'Failed to assign user.');
+    }
+  }
+
+  function closeAssignUserModal() {
+    setShowAssignUserModal(false);
+    setAssignUserEmail('');
+    setUnassignedUsers([]);
+    setAssignUserError('');
+    setInviteEmailNotFound(false);
+    setAssignUserRole('ISSUER');
+  }
+
+  async function handleInviteOrganizationUser() {
+    const email = assignUserEmail.trim();
+    if (!email) return;
+    try {
+      await api.admin.inviteUserToOrganization(organization.organizationId, { email, role: assignUserRole });
+      setMessage(`Invitation dispatched to ${email}!`);
+      closeAssignUserModal();
+      await fetchOrganizationUsers();
+    } catch (err) {
+      setAssignUserError(err.message || 'Failed to send organization invitation.');
     }
   }
 
@@ -186,6 +268,65 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
       setMessage(`${user.name}'s access to ${organization.name} was revoked.`);
     } catch (err) {
       setError(err.message || 'Failed to revoke organization access');
+    }
+  }
+
+  async function handleResendInvite(user) {
+    try {
+      await api.admin.resendUserInvitation(organization.organizationId, user.userId || user.id || user._id);
+      setMessage(`Invitation resent to ${user.email}.`);
+    } catch (err) {
+      setError(err.message || 'Failed to resend organization invitation');
+    }
+  }
+
+  function updateBulkCsv(text) {
+    setBulkCsvText(text);
+    const parsed = parseOrganizationUserCsv(text);
+    setBulkRows(parsed.rows);
+    setBulkError(parsed.error);
+    setBulkSummary(null);
+  }
+
+  async function handleBulkCsvFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      setBulkError('Choose a .csv file.');
+      return;
+    }
+    updateBulkCsv(await file.text());
+  }
+
+  function downloadOrganizationUsersSample() {
+    const blob = new Blob(['name,email,role\nJane Doe,jane@example.com,ISSUER\nAlex Smith,alex@example.com,MEMBER\n'], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'organization_users_sample.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function handleBulkUpload() {
+    if (bulkError) return;
+    if (!bulkRows.length) {
+      setBulkError('Paste CSV data or choose a CSV file first.');
+      return;
+    }
+    setBulkLoading(true);
+    setBulkError('');
+    setBulkSummary(null);
+    try {
+      const response = await api.admin.bulkUploadOrganizationUsers(organization.organizationId, bulkRows);
+      const summary = response?.data || response;
+      setBulkSummary(summary);
+      setMessage(`${summary.successCount || 0} Users Imported / ${summary.invitedCount || 0} Pending Invites Sent`);
+      await fetchOrganizationUsers();
+    } catch (err) {
+      setBulkError(err.message || 'Bulk user upload failed.');
+    } finally {
+      setBulkLoading(false);
     }
   }
 
@@ -640,7 +781,7 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
               Manage organization membership and role-based access for {organization.name}.
             </p>
           </div>
-          <div style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', borderBottom: '1px solid var(--border-color)' }}>
+          <div className="flex items-center justify-between gap-4 w-full" style={{ padding: '1rem 1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', width: '100%', flexWrap: 'wrap', borderBottom: '1px solid var(--border-color)' }}>
             <input
               type="search"
               className="form-input"
@@ -650,12 +791,20 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
               aria-label="Search organization users by name or email"
               style={{ maxWidth: '360px', minWidth: '220px' }}
             />
-            <button
-              className="action-btn primary text-xs"
-              onClick={() => { setAssignUserError(''); setUnassignedUsers([]); setAssignUserEmail(''); setShowAssignUserModal(true); }}
-            >
-              + Assign User to Org
-            </button>
+            <div className="flex items-center space-x-3 ml-auto" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginLeft: 'auto' }}>
+              <button
+                className="action-btn primary text-xs"
+                onClick={() => { setAssignUserError(''); setInviteEmailNotFound(false); setUnassignedUsers([]); setAssignUserEmail(''); setShowAssignUserModal(true); }}
+              >
+                + Assign User to Org
+              </button>
+              <button
+                className="action-btn secondary text-xs"
+                onClick={() => { setBulkCsvText(''); setBulkRows([]); setBulkError(''); setBulkSummary(null); setShowBulkUploadModal(true); }}
+              >
+                + Bulk CSV Upload
+              </button>
+            </div>
           </div>
           {loadingOrganizationUsers ? (
             <div className="empty-state">Loading organization users...</div>
@@ -675,7 +824,13 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
                       <td><strong>{user.name}</strong></td>
                       <td>{user.email}</td>
                       <td><span className="badge-tag" style={{ color: user.role === 'ISSUER' ? 'var(--accent-purple)' : 'var(--accent-cyan)', borderColor: 'rgba(139, 92, 246, 0.35)' }}>{user.role}</span></td>
-                      <td><span className="badge-tag" style={{ color: user.status === 'ACTIVE' ? 'var(--accent-emerald)' : 'var(--accent-purple)' }}>{user.status || 'PENDING'}</span></td>
+                      <td>
+                        {user.status === 'PENDING_INVITE' ? (
+                          <span className="badge-tag" style={{ color: '#fbbf24', borderColor: 'rgba(251, 191, 36, 0.4)' }}>Pending Invite</span>
+                        ) : (
+                          <span className="badge-tag" style={{ color: user.status === 'ACTIVE' ? 'var(--accent-emerald)' : 'var(--accent-purple)' }}>{user.status || 'PENDING'}</span>
+                        )}
+                      </td>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
                           <select
@@ -692,6 +847,11 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
                           <button className="action-btn danger text-xs" onClick={() => handleRevokeOrganizationUser(user)} style={{ padding: '0.25rem 0.5rem' }}>
                             Revoke Org Access
                           </button>
+                          {user.status === 'PENDING_INVITE' && (
+                            <button className="action-btn secondary text-xs" onClick={() => handleResendInvite(user)} style={{ padding: '0.25rem 0.5rem', color: '#fbbf24', borderColor: 'rgba(251, 191, 36, 0.4)' }}>
+                              Resend Invite
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -835,20 +995,37 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
       )}
 
       {showAssignUserModal && (
-        <div role="presentation" onClick={(event) => { if (event.target === event.currentTarget && !searchingUnassignedUsers) setShowAssignUserModal(false); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.68)', display: 'grid', placeItems: 'center', padding: '1rem' }}>
+        <div role="presentation" onClick={(event) => { if (event.target === event.currentTarget && !searchingUnassignedUsers) closeAssignUserModal(); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.68)', display: 'grid', placeItems: 'center', padding: '1rem' }}>
           <section role="dialog" aria-modal="true" aria-labelledby="assign-organization-user-title" className="glass-card" style={{ width: 'min(100%, 560px)', maxHeight: '85vh', overflowY: 'auto', padding: '1.5rem', boxShadow: '0 20px 70px rgba(0,0,0,0.45)' }}>
             <h2 id="assign-organization-user-title" style={{ marginTop: 0 }}>Assign User to {organization.name}</h2>
             <label className="text-muted" htmlFor="assign-user-email">Search unassigned users by email</label>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.35rem' }}>
-              <input id="assign-user-email" type="email" className="form-input" value={assignUserEmail} onChange={(event) => setAssignUserEmail(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') searchUnassignedUsers(); }} placeholder="name@example.com" style={{ flex: 1, minWidth: 0 }} />
+              <input id="assign-user-email" type="email" className="form-input" value={assignUserEmail} onChange={(event) => { setAssignUserEmail(event.target.value); setInviteEmailNotFound(false); setUnassignedUsers([]); setAssignUserError(''); }} onKeyDown={(event) => { if (event.key === 'Enter') searchUnassignedUsers(); }} placeholder="name@example.com" style={{ flex: 1, minWidth: 0 }} />
               <button type="button" className="action-btn secondary text-xs" onClick={searchUnassignedUsers} disabled={searchingUnassignedUsers}>{searchingUnassignedUsers ? 'Searching…' : 'Search'}</button>
             </div>
-            <label className="text-muted" htmlFor="assign-user-role" style={{ display: 'block', marginTop: '1rem' }}>Organization role</label>
-            <select id="assign-user-role" className="form-select" value={assignUserRole} onChange={(event) => setAssignUserRole(event.target.value)} style={{ marginTop: '0.35rem' }}>
-              <option value="ISSUER">ISSUER</option>
-              <option value="MEMBER">MEMBER</option>
-            </select>
+            {!inviteEmailNotFound && (
+              <>
+                <label className="text-muted" htmlFor="assign-user-role" style={{ display: 'block', marginTop: '1rem' }}>Organization role</label>
+                <select id="assign-user-role" className="form-select" value={assignUserRole} onChange={(event) => setAssignUserRole(event.target.value)} style={{ marginTop: '0.35rem' }}>
+                  <option value="ISSUER">ISSUER</option>
+                  <option value="MEMBER">MEMBER</option>
+                </select>
+              </>
+            )}
             {assignUserError && <div role="alert" className="alert-banner danger" style={{ marginTop: '1rem' }}><AlertTriangle size={16} /><span>{assignUserError}</span></div>}
+            {inviteEmailNotFound && (
+              <div className="glass-card" style={{ padding: '1rem', marginTop: '1rem', border: '1px solid rgba(139, 92, 246, 0.4)', background: 'rgba(139, 92, 246, 0.08)' }}>
+                <strong style={{ display: 'block', marginBottom: '0.8rem' }}>No registered account found for {assignUserEmail.trim()}.</strong>
+                <label className="text-muted" htmlFor="invite-user-role">Pre-assigned organization role</label>
+                <select id="invite-user-role" className="form-select" value={assignUserRole} onChange={(event) => setAssignUserRole(event.target.value)} style={{ marginTop: '0.35rem' }}>
+                  <option value="ISSUER">ISSUER</option>
+                  <option value="MEMBER">MEMBER</option>
+                </select>
+                <button type="button" className="action-btn primary text-xs" onClick={handleInviteOrganizationUser} style={{ marginTop: '0.85rem' }}>
+                  📧 Send Email Invite &amp; Pre-Bind Account
+                </button>
+              </div>
+            )}
             {unassignedUsers.length > 0 && (
               <div style={{ marginTop: '1rem', display: 'grid', gap: '0.5rem' }}>
                 {unassignedUsers.map((user) => (
@@ -860,7 +1037,50 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
               </div>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
-              <button type="button" className="action-btn secondary text-xs" onClick={() => setShowAssignUserModal(false)} disabled={searchingUnassignedUsers}>Close</button>
+              <button type="button" className="action-btn secondary text-xs" onClick={closeAssignUserModal} disabled={searchingUnassignedUsers}>Close</button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showBulkUploadModal && (
+        <div role="presentation" onClick={(event) => { if (event.target === event.currentTarget && !bulkLoading) setShowBulkUploadModal(false); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.68)', display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="bulk-organization-users-title" className="glass-card" style={{ width: 'min(100%, 680px)', maxHeight: '88vh', overflowY: 'auto', padding: '1.5rem', boxShadow: '0 20px 70px rgba(0,0,0,0.45)', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
+            <h2 id="bulk-organization-users-title" style={{ marginTop: 0 }}>Bulk CSV User Upload</h2>
+            <p className="text-muted" style={{ marginTop: '-0.4rem' }}>Import existing accounts and send expiring invitations to new users.</p>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap', margin: '1rem 0' }}>
+              <label className="action-btn secondary text-xs" htmlFor="organization-users-csv">Choose CSV File</label>
+              <input id="organization-users-csv" type="file" accept=".csv,text/csv" onChange={handleBulkCsvFile} style={{ maxWidth: '100%' }} />
+              <button type="button" className="action-btn secondary text-xs" onClick={downloadOrganizationUsersSample}>Download Sample CSV</button>
+            </div>
+            <label className="text-muted" htmlFor="organization-users-csv-text">Or paste CSV text (`name,email,role`)</label>
+            <textarea
+              id="organization-users-csv-text"
+              className="form-input"
+              value={bulkCsvText}
+              onChange={(event) => updateBulkCsv(event.target.value)}
+              placeholder={'name,email,role\nJane Doe,jane@example.com,ISSUER\nAlex Smith,alex@example.com,MEMBER'}
+              rows={7}
+              style={{ display: 'block', width: '100%', marginTop: '0.4rem', resize: 'vertical', fontFamily: 'monospace' }}
+            />
+            <div className="text-muted text-xs" style={{ marginTop: '0.45rem' }}>{bulkRows.length} user row(s) parsed. Roles: ISSUER or MEMBER; omitted roles default to ISSUER.</div>
+            {bulkError && <div role="alert" className="alert-banner danger" style={{ marginTop: '1rem' }}><AlertTriangle size={16} /><span>{bulkError}</span></div>}
+            {bulkSummary && (
+              <div role="status" className="alert-banner success" style={{ marginTop: '1rem', display: 'block' }}>
+                <strong>{bulkSummary.successCount} Users Imported / {bulkSummary.invitedCount} Pending Invites Sent</strong>
+                <div className="text-xs" style={{ marginTop: '0.25rem' }}>{bulkSummary.existingUpdatedCount} existing accounts updated.</div>
+                {bulkSummary.errors?.length > 0 && (
+                  <ul className="text-xs" style={{ marginBottom: 0, maxHeight: '100px', overflowY: 'auto' }}>
+                    {bulkSummary.errors.map((item, index) => <li key={`${item.row}-${index}`}>Row {item.row}{item.email ? ` (${item.email})` : ''}: {item.message}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem' }}>
+              <button type="button" className="action-btn secondary text-xs" onClick={() => setShowBulkUploadModal(false)} disabled={bulkLoading}>Close</button>
+              <button type="button" className="action-btn primary text-xs" onClick={handleBulkUpload} disabled={bulkLoading || !bulkRows.length || Boolean(bulkError)}>
+                {bulkLoading ? 'Importing…' : `Import ${bulkRows.length} User${bulkRows.length === 1 ? '' : 's'}`}
+              </button>
             </div>
           </section>
         </div>

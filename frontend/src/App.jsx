@@ -129,7 +129,7 @@ export function AppRoutes() {
         <Route
           path="/dashboard"
           element={
-            <RoleRoute allowedRoles={['ADMIN', 'USER', 'ISSUER', 'HR', 'AUDITOR']}>
+            <RoleRoute allowedRoles={['ADMIN', 'USER', 'MEMBER', 'ISSUER', 'HR', 'AUDITOR']}>
               <PageWrapper Component={UserDashboard} />
             </RoleRoute>
           }
@@ -137,7 +137,7 @@ export function AppRoutes() {
         <Route
           path="/upload"
           element={
-            <RoleRoute allowedRoles={['ADMIN', 'USER']}>
+            <RoleRoute allowedRoles={['ADMIN', 'USER', 'MEMBER']}>
               <PageWrapper Component={UploadDocument} />
             </RoleRoute>
           }
@@ -145,7 +145,7 @@ export function AppRoutes() {
         <Route
           path="/verify"
           element={
-            <RoleRoute allowedRoles={['ADMIN', 'HR', 'USER']}>
+            <RoleRoute allowedRoles={['ADMIN', 'HR', 'USER', 'MEMBER']}>
               <PageWrapper Component={VerifyDocument} />
             </RoleRoute>
           }
@@ -153,7 +153,7 @@ export function AppRoutes() {
         <Route
           path="/history"
           element={
-            <RoleRoute allowedRoles={['ADMIN', 'USER', 'HR']}>
+            <RoleRoute allowedRoles={['ADMIN', 'USER', 'HR', 'MEMBER']}>
               <PageWrapper Component={VerificationHistory} />
             </RoleRoute>
           }
@@ -161,7 +161,7 @@ export function AppRoutes() {
         <Route
           path="/credentials"
           element={
-            <RoleRoute allowedRoles={['ADMIN', 'USER']}>
+            <RoleRoute allowedRoles={['ADMIN', 'USER', 'MEMBER']}>
               <PageWrapper Component={MyCredentials} />
             </RoleRoute>
           }
@@ -169,7 +169,7 @@ export function AppRoutes() {
         <Route
           path="/analysis"
           element={
-            <RoleRoute allowedRoles={['ADMIN', 'USER']}>
+            <RoleRoute allowedRoles={['ADMIN', 'USER', 'MEMBER']}>
               <PageWrapper Component={DocumentAnalysis} />
             </RoleRoute>
           }

@@ -5,6 +5,7 @@ import AnimatedBackground from '../components/AnimatedBackground';
 
 export default function Register({ onNavigate }) {
   const { register } = useAuth();
+  const invitationToken = new URLSearchParams(window.location.search).get('token') || '';
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -14,7 +15,7 @@ export default function Register({ onNavigate }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!name || !email || !password) {
+    if ((!invitationToken && (!name || !email)) || !password) {
       setError('Please fill in all required fields.');
       return;
     }
@@ -29,7 +30,7 @@ export default function Register({ onNavigate }) {
     setError('');
     setLoading(true);
     try {
-      await register({ name, email, password });
+      await register({ name, email, password, ...(invitationToken ? { invitationToken } : {}) });
       onNavigate('dashboard');
     } catch (err) {
       setError(err.message || 'Registration failed');
@@ -47,9 +48,9 @@ export default function Register({ onNavigate }) {
           <div className="logo-badge" style={{ margin: '0 auto 1rem auto' }}>
             <Shield size={28} />
           </div>
-          <h2>Create Your Account</h2>
+          <h2>{invitationToken ? 'Accept Your Invitation' : 'Create Your Account'}</h2>
           <p className="text-secondary text-sm">
-            Join the cryptographically verified workforce credential platform.
+            {invitationToken ? 'Set a password to activate your organization account.' : 'Join the cryptographically verified workforce credential platform.'}
           </p>
         </div>
 
@@ -70,7 +71,7 @@ export default function Register({ onNavigate }) {
                 placeholder="Dr. Jane Doe"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                required
+                required={!invitationToken}
               />
             </div>
           </div>
@@ -84,7 +85,7 @@ export default function Register({ onNavigate }) {
                 placeholder="jane.doe@organization.edu"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                required
+                required={!invitationToken}
               />
             </div>
           </div>

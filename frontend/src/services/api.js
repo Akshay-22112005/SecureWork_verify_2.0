@@ -89,8 +89,12 @@ export const api = {
   // Organization-scoped administration
   admin: {
     getOrganizationUsers: (id) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users`),
+    searchOrganizationUser: (id, email) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/search?email=${encodeURIComponent(email)}`),
     assignUserToOrganization: (id, userId, role) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users`, { method: 'POST', body: { userId, role } }),
-    removeUserFromOrganization: (id, userId) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/${encodeURIComponent(userId)}`, { method: 'DELETE' })
+    inviteUserToOrganization: (id, data) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/invite`, { method: 'POST', body: data }),
+    removeUserFromOrganization: (id, userId) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
+    bulkUploadOrganizationUsers: (id, rows) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/bulk-csv`, { method: 'POST', body: { rows } }),
+    resendUserInvitation: (id, userId) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/${encodeURIComponent(userId)}/resend-invite`, { method: 'POST' })
   },
 
   // Issuers

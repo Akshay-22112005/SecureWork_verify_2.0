@@ -16,19 +16,51 @@ class AuthService {
    * @param {string} params.name
    * @param {string} params.email
    * @param {string} params.password
+   * @param {string} [params.invitationToken]
    * @returns {Promise<{ user: object, token: string }>}
    */
-  async register({ name, email, password }) {
+  async register({ name, email, password, invitationToken }) {
+    if (!password || typeof password !== 'string' || password.length < 8) {
+      throw new ValidationError('Password must be at least 8 characters long');
+    }
+
+    if (invitationToken) {
+      const passwordHash = await User.hashPassword(password);
+      const pendingInvite = await User.findOne({
+        invitationToken,
+        status: 'PENDING_INVITE',
+        invitationExpiresAt: { $gt: new Date() }
+      }).select('role');
+      if (!pendingInvite) {
+        throw new NotFoundError('Invitation token is invalid or has expired', 'INVITATION_INVALID');
+      }
+      // MEMBER is an organization label; the standard candidate permissions use USER.
+      const invitedRole = pendingInvite.role === 'MEMBER' ? 'USER' : pendingInvite.role;
+      const user = await User.findOneAndUpdate(
+        {
+          invitationToken,
+          status: 'PENDING_INVITE',
+          invitationExpiresAt: { $gt: new Date() }
+        },
+        {
+          $set: { passwordHash, status: 'ACTIVE', role: invitedRole, invitationToken: null, invitationExpiresAt: null }
+        },
+        { new: true, runValidators: true }
+      );
+      if (!user) {
+        throw new NotFoundError('Invitation token is invalid or has expired', 'INVITATION_INVALID');
+      }
+
+      const token = generateToken(user);
+      return { user: user.toJSON(), token };
+    }
+
     if (!name || typeof name !== 'string' || name.trim().length === 0) {
       throw new ValidationError('Name is required');
     }
 
     if (!email || !isValidEmail(email)) {
       throw new ValidationError('A valid email address is required');
-    }
-
-    if (!password || typeof password !== 'string' || password.length < 8) {
-      throw new ValidationError('Password must be at least 8 characters long');
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -88,6 +120,12 @@ class AuthService {
     const isMatch = await user.comparePassword(password);
     if (!isMatch) {
       throw new UnauthorizedError('Invalid email or password', 'INVALID_CREDENTIALS');
+    }
+
+    // Normalize legacy/organization MEMBER accounts to the baseline system role.
+    if (user.role === 'MEMBER') {
+      user.role = 'USER';
+      await user.save();
     }
 
     const token = generateToken(user);

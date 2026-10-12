@@ -4,7 +4,7 @@ const mongoose = require('mongoose');
 const baseModelPlugin = require('./plugins/baseModel.plugin');
 
 const ROLES = ['ADMIN', 'ISSUER', 'HR', 'USER', 'AUDITOR', 'MEMBER'];
-const STATUSES = ['ACTIVE', 'SUSPENDED', 'INACTIVE'];
+const STATUSES = ['PENDING_INVITE', 'ACTIVE', 'SUSPENDED'];
 
 const UserSchema = new mongoose.Schema({
   userId: {
@@ -29,7 +29,7 @@ const UserSchema = new mongoose.Schema({
   },
   passwordHash: {
     type: String,
-    required: [true, 'Password hash is required'],
+    required: function passwordRequired() { return this.status !== 'PENDING_INVITE'; },
     select: false // Never return passwordHash in queries by default
   },
   role: {
@@ -43,6 +43,16 @@ const UserSchema = new mongoose.Schema({
     enum: STATUSES,
     default: 'ACTIVE',
     index: true
+  },
+  invitationToken: {
+    type: String,
+    default: null,
+    select: false,
+    index: true
+  },
+  invitationExpiresAt: {
+    type: Date,
+    default: null
   },
   organizationId: {
     type: mongoose.Schema.Types.ObjectId,

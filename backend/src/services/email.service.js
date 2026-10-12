@@ -13,52 +13,44 @@ class EmailService {
   }
 
   async _initTransporter() {
-    if (env.IS_PRODUCTION && process.env.SMTP_HOST) {
+    const smtpUser = process.env.SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS;
+    if (smtpUser && smtpPass) {
       this.transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST,
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
         port: parseInt(process.env.SMTP_PORT || '587', 10),
         secure: process.env.SMTP_SECURE === 'true',
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS
-        }
+        connectionTimeout: 8000,
+        greetingTimeout: 8000,
+        socketTimeout: 12000,
+        auth: { user: smtpUser, pass: smtpPass }
       });
-    } else {
-      // In test environment, directly use JSON transport to avoid external SMTP
-      if (process.env.NODE_ENV === 'test') {
+      try {
+        await this.transporter.verify();
+        logger.info(`[EmailService] Real SMTP transporter initialized for ${smtpUser}`);
+      } catch (err) {
+        logger.warn(`[EmailService] SMTP verification failed for ${smtpUser}: ${err.message}; using JSON fallback.`);
         this.transporter = nodemailer.createTransport({ jsonTransport: true });
-      } else {
-        // Create Ethereal test account or fallback to JSON transport
-        try {
-          const testAccount = await nodemailer.createTestAccount();
-          this.transporter = nodemailer.createTransport({
-            host: 'smtp.ethereal.email',
-            port: 5887,
-            secure: false,
-            auth: {
-              user: testAccount.user,
-              pass: testAccount.pass
-            }
-          });
-          logger.info(`Ethereal test SMTP initialized: ${testAccount.user}`);
-        } catch {
-          // Fallback to JSON transport
-          this.transporter = nodemailer.createTransport({ jsonTransport: true });
-        }
+        logger.info('[EmailService] Fallback JSON transport initialized.');
       }
+    } else {
+      // Keep local startup independent of external test SMTP account provisioning.
+      this.transporter = nodemailer.createTransport({ jsonTransport: true });
+      logger.info('[EmailService] SMTP credentials missing; using in-memory JSON fallback transport.');
     }
   }
 
   /**
    * Send notification email.
    */
-  async sendEmail({ to, subject, html, text }) {
+  async sendEmail({ from, to, subject, html, text }) {
     await this.initPromise;
     if (!this.transporter) return;
+    const sender = from || process.env.SMTP_FROM || process.env.SMTP_USER || '"SecureWork Verify" <no-reply@securework.io>';
 
     try {
       const info = await this.transporter.sendMail({
-        from: '"SecureWork Verify" <no-reply@securework.io>',
+        from: sender,
         to,
         subject,
         text,
@@ -68,6 +60,8 @@ class EmailService {
       const previewUrl = nodemailer.getTestMessageUrl(info);
       if (previewUrl) {
         logger.info(`[Email Preview]: ${previewUrl}`);
+      } else if (this.transporter.options?.jsonTransport) {
+        logger.info('[Email JSON transport]', { to, subject });
       }
       return info;
     } catch (err) {
@@ -77,7 +71,7 @@ class EmailService {
         this.transporter = nodemailer.createTransport({ jsonTransport: true });
         try {
           const retryInfo = await this.transporter.sendMail({
-            from: '"SecureWork Verify" <no-reply@securework.io>',
+            from: sender,
             to,
             subject,
             text,
@@ -93,6 +87,39 @@ class EmailService {
         }
       }
     }
+  }
+
+  async sendOrganizationInvitation({ email, name, organizationName, inviteToken, role }) {
+    const frontendUrl = (process.env.FRONTEND_URL || env.FRONTEND_URL).replace(/\/+$/, '');
+    const registrationUrl = `${frontendUrl}/register?token=${encodeURIComponent(inviteToken)}`;
+    const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[character]));
+    const safeName = escapeHtml(name || 'there');
+    const safeOrganization = escapeHtml(organizationName);
+    const safeRole = escapeHtml(role);
+    const html = `
+      <div style="font-family: Arial, sans-serif; background:#0b1120; color:#e2e8f0; padding:32px; border-radius:12px; max-width:600px; margin:auto;">
+        <div style="border:1px solid rgba(139,92,246,.45); background:#111827; padding:28px; border-radius:10px;">
+          <p style="color:#a78bfa; letter-spacing:2px; font-size:12px; font-weight:bold;">SECUREWORK VERIFY</p>
+          <h1 style="color:#f8fafc; font-size:24px;">You’re invited to join ${safeOrganization}</h1>
+          <p>Hello ${safeName},</p>
+          <p>You have been invited to ${safeOrganization} as an <strong style="color:#34d399;">${safeRole}</strong>.</p>
+          <p>Complete your account setup using the secure invitation link below. This link expires in 7 days.</p>
+          <a href="${registrationUrl}" style="background:#8b5cf6; color:#fff; padding:12px 20px; text-decoration:none; border-radius:6px; font-weight:bold; display:inline-block;">Accept Invitation</a>
+          <p style="color:#94a3b8; font-size:12px; margin-top:24px;">If you were not expecting this invitation, you can ignore this email.</p>
+        </div>
+      </div>
+    `;
+    const info = await this.sendEmail({
+      from: process.env.SMTP_FROM || process.env.SMTP_USER || '"SecureWork Verify" <no-reply@securework.io>',
+      to: email,
+      subject: `Invitation to join ${organizationName} on SecureWork Verify`,
+      text: `Hello ${name || 'there'}, you have been invited to join ${organizationName} as ${role}. Complete registration at ${registrationUrl}. This link expires in 7 days.`,
+      html
+    });
+    if (!info) return { success: false, messageId: null };
+    return { success: true, messageId: info.messageId };
   }
 
   async sendCredentialIssuedEmail(recipientEmailOrUser, recipientNameOrCred, credentialTitle, verifyUrl) {
