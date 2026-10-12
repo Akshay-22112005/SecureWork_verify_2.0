@@ -86,6 +86,13 @@ export const api = {
     revoke: (id, reason) => apiClient(`/organizations/${id}/revoke`, { method: 'PATCH', body: { reason } })
   },
 
+  // Organization-scoped administration
+  admin: {
+    getOrganizationUsers: (id) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users`),
+    assignUserToOrganization: (id, userId, role) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users`, { method: 'POST', body: { userId, role } }),
+    removeUserFromOrganization: (id, userId) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/${encodeURIComponent(userId)}`, { method: 'DELETE' })
+  },
+
   // Issuers
   issuers: {
     list: (params = {}) => {

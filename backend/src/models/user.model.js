@@ -3,7 +3,7 @@ const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
 const baseModelPlugin = require('./plugins/baseModel.plugin');
 
-const ROLES = ['ADMIN', 'ISSUER', 'HR', 'USER', 'AUDITOR'];
+const ROLES = ['ADMIN', 'ISSUER', 'HR', 'USER', 'AUDITOR', 'MEMBER'];
 const STATUSES = ['ACTIVE', 'SUSPENDED', 'INACTIVE'];
 
 const UserSchema = new mongoose.Schema({
@@ -76,6 +76,7 @@ UserSchema.statics.hashPassword = async function (plainPassword) {
 
 // Apply standard base model plugin (timestamps, id mapping, secret stripping)
 UserSchema.plugin(baseModelPlugin);
+UserSchema.index({ organizationId: 1, role: 1 });
 
 const User = mongoose.models.User || mongoose.model('User', UserSchema);
 

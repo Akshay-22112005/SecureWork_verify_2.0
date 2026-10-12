@@ -114,6 +114,12 @@ class UserService {
     if (filters.status && STATUSES.includes(filters.status)) {
       query.status = filters.status;
     }
+    if (filters.email && typeof filters.email === 'string') {
+      query.email = { $regex: filters.email.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), $options: 'i' };
+    }
+    if (filters.organizationId === 'unassigned') {
+      query.organizationId = null;
+    }
 
     const [users, total] = await Promise.all([
       User.find(query).skip(skip).limit(limit).sort({ createdAt: -1 }),

@@ -18,6 +18,7 @@ const apiKeyRoutes = require('./apiKey.routes');
 const webhookRoutes = require('./webhook.routes');
 const analyticsRoutes = require('./analytics.routes');
 const hrRoutes = require('./hr.routes');
+const adminRoutes = require('./admin.routes');
 
 const router = express.Router();
 
@@ -28,6 +29,7 @@ router.use('/api-keys', apiKeyRoutes);
 router.use('/webhooks', webhookRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/hr', hrRoutes);
+router.use('/admin', adminRoutes);
 router.use('/health', healthRoutes);
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);

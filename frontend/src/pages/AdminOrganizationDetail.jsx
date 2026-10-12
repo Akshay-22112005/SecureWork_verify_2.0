@@ -37,6 +37,15 @@ export default function AdminOrganizationDetail({ onNavigate }) {
   const [verifyingUser, setVerifyingUser] = useState(false);
   const [registeringIssuer, setRegisteringIssuer] = useState(false);
   const [modalError, setModalError] = useState('');
+  const [organizationUsers, setOrganizationUsers] = useState([]);
+  const [loadingOrganizationUsers, setLoadingOrganizationUsers] = useState(false);
+  const [userSearch, setUserSearch] = useState('');
+  const [showAssignUserModal, setShowAssignUserModal] = useState(false);
+  const [assignUserEmail, setAssignUserEmail] = useState('');
+  const [assignUserRole, setAssignUserRole] = useState('ISSUER');
+  const [unassignedUsers, setUnassignedUsers] = useState([]);
+  const [searchingUnassignedUsers, setSearchingUnassignedUsers] = useState(false);
+  const [assignUserError, setAssignUserError] = useState('');
 
   // Associated resources
   const [issuers, setIssuers] = useState([]);
@@ -108,6 +117,77 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
       fetchOrg();
     }
   }, [organizationId]);
+
+  async function fetchOrganizationUsers() {
+    if (!organization) return;
+    setLoadingOrganizationUsers(true);
+    try {
+      const res = await api.admin.getOrganizationUsers(organization.organizationId);
+      setOrganizationUsers(res?.data?.users || res?.users || []);
+    } catch (err) {
+      setError(err.message || 'Failed to load organization users');
+    } finally {
+      setLoadingOrganizationUsers(false);
+    }
+  }
+
+  useEffect(() => {
+    if (activeTab === 'rbac' && organization) fetchOrganizationUsers();
+  }, [activeTab, organization?.organizationId]);
+
+  async function searchUnassignedUsers() {
+    const email = assignUserEmail.trim();
+    if (!email) {
+      setAssignUserError('Enter an email address to search.');
+      return;
+    }
+    setAssignUserError('');
+    setSearchingUnassignedUsers(true);
+    try {
+      const res = await api.users.list({ email, organizationId: 'unassigned', limit: 100 });
+      const result = res?.data || res;
+      setUnassignedUsers(result?.users || []);
+      if (!result?.users?.length) setAssignUserError('No unassigned users found for that email.');
+    } catch (err) {
+      setAssignUserError(err.message || 'Unable to search users.');
+    } finally {
+      setSearchingUnassignedUsers(false);
+    }
+  }
+
+  async function handleAssignOrganizationUser(user) {
+    try {
+      await api.admin.assignUserToOrganization(organization.organizationId, user.userId || user.id || user._id, assignUserRole);
+      setMessage(`${user.name} was assigned to ${organization.name} as ${assignUserRole}.`);
+      setShowAssignUserModal(false);
+      setAssignUserEmail('');
+      setUnassignedUsers([]);
+      await fetchOrganizationUsers();
+    } catch (err) {
+      setAssignUserError(err.message || 'Failed to assign user.');
+    }
+  }
+
+  async function handleOrganizationUserRoleChange(user, role) {
+    try {
+      await api.admin.assignUserToOrganization(organization.organizationId, user.userId || user.id || user._id, role);
+      await fetchOrganizationUsers();
+      setMessage(`${user.name}'s organization role was updated to ${role}.`);
+    } catch (err) {
+      setError(err.message || 'Failed to update organization role');
+    }
+  }
+
+  async function handleRevokeOrganizationUser(user) {
+    if (!confirm(`Revoke ${user.name}'s access to ${organization.name}?`)) return;
+    try {
+      await api.admin.removeUserFromOrganization(organization.organizationId, user.userId || user.id || user._id);
+      setOrganizationUsers((current) => current.filter((entry) => String(entry._id || entry.id) !== String(user._id || user.id)));
+      setMessage(`${user.name}'s access to ${organization.name} was revoked.`);
+    } catch (err) {
+      setError(err.message || 'Failed to revoke organization access');
+    }
+  }
 
   async function handleVerify() {
     if (!confirm(`Verify and accredit "${organization.name}"? Member issuers will become eligible for accreditation.`)) return;
@@ -244,6 +324,7 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Building },
     { id: 'issuers', label: `Issuers (${issuers.length})`, icon: FileBadge },
+    { id: 'rbac', label: 'RBAC & Users', icon: Users },
     { id: 'sources', label: `Trusted Sources (${trustedSources.length})`, icon: Link2 },
     { id: 'audit', label: 'Audit Trail', icon: Clock },
   ];
@@ -551,6 +632,82 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
         </div>
       )}
 
+      {activeTab === 'rbac' && (
+        <div className="glass-card table-container">
+          <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid var(--border-color)' }}>
+            <h3 style={{ margin: 0 }}>Organization User Directory &amp; Access Control</h3>
+            <p className="text-muted" style={{ margin: '0.25rem 0 0', fontSize: '0.8rem' }}>
+              Manage organization membership and role-based access for {organization.name}.
+            </p>
+          </div>
+          <div style={{ padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap', borderBottom: '1px solid var(--border-color)' }}>
+            <input
+              type="search"
+              className="form-input"
+              value={userSearch}
+              onChange={(event) => setUserSearch(event.target.value)}
+              placeholder="Search by name or email"
+              aria-label="Search organization users by name or email"
+              style={{ maxWidth: '360px', minWidth: '220px' }}
+            />
+            <button
+              className="action-btn primary text-xs"
+              onClick={() => { setAssignUserError(''); setUnassignedUsers([]); setAssignUserEmail(''); setShowAssignUserModal(true); }}
+            >
+              + Assign User to Org
+            </button>
+          </div>
+          {loadingOrganizationUsers ? (
+            <div className="empty-state">Loading organization users...</div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>USER ID</th><th>NAME</th><th>EMAIL</th><th>ROLE</th><th>STATUS</th><th>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {organizationUsers
+                  .filter((user) => `${user.name || ''} ${user.email || ''}`.toLowerCase().includes(userSearch.trim().toLowerCase()))
+                  .map((user) => (
+                    <tr key={user._id || user.id || user.userId}>
+                      <td className="code-snippet">{user.userId || user._id || user.id}</td>
+                      <td><strong>{user.name}</strong></td>
+                      <td>{user.email}</td>
+                      <td><span className="badge-tag" style={{ color: user.role === 'ISSUER' ? 'var(--accent-purple)' : 'var(--accent-cyan)', borderColor: 'rgba(139, 92, 246, 0.35)' }}>{user.role}</span></td>
+                      <td><span className="badge-tag" style={{ color: user.status === 'ACTIVE' ? 'var(--accent-emerald)' : 'var(--accent-purple)' }}>{user.status || 'PENDING'}</span></td>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap' }}>
+                          <select
+                            className="form-select text-xs"
+                            aria-label={`Change ${user.name}'s organization role`}
+                            value={user.role}
+                            onChange={(event) => handleOrganizationUserRoleChange(user, event.target.value)}
+                            style={{ padding: '0.25rem 0.4rem', width: 'auto', minWidth: '105px' }}
+                          >
+                            {!['ISSUER', 'MEMBER'].includes(user.role) && <option value={user.role}>{user.role}</option>}
+                            <option value="ISSUER">ISSUER</option>
+                            <option value="MEMBER">MEMBER</option>
+                          </select>
+                          <button className="action-btn danger text-xs" onClick={() => handleRevokeOrganizationUser(user)} style={{ padding: '0.25rem 0.5rem' }}>
+                            Revoke Org Access
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                {organizationUsers.length === 0 && (
+                  <tr><td colSpan="6" className="text-muted" style={{ textAlign: 'center', padding: '1.5rem' }}>No users are assigned to this organization yet.</td></tr>
+                )}
+                {organizationUsers.length > 0 && organizationUsers.filter((user) => `${user.name || ''} ${user.email || ''}`.toLowerCase().includes(userSearch.trim().toLowerCase())).length === 0 && (
+                  <tr><td colSpan="6" className="text-muted" style={{ textAlign: 'center', padding: '1.5rem' }}>No users match your search.</td></tr>
+                )}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
+
       {/* Tab 3: Trusted Sources */}
       {activeTab === 'sources' && (
         <div className="glass-card table-container">
@@ -672,6 +829,38 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem' }}>
               <button type="button" className="action-btn secondary text-xs" onClick={() => setShowRegisterModal(false)} disabled={registeringIssuer}>Cancel</button>
               <button type="button" className="action-btn primary text-xs" onClick={handleConfirmRegisterIssuer} disabled={!verifiedUser || registeringIssuer}>{registeringIssuer ? 'Registering…' : 'Confirm & Bind Issuer'}</button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showAssignUserModal && (
+        <div role="presentation" onClick={(event) => { if (event.target === event.currentTarget && !searchingUnassignedUsers) setShowAssignUserModal(false); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.68)', display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="assign-organization-user-title" className="glass-card" style={{ width: 'min(100%, 560px)', maxHeight: '85vh', overflowY: 'auto', padding: '1.5rem', boxShadow: '0 20px 70px rgba(0,0,0,0.45)' }}>
+            <h2 id="assign-organization-user-title" style={{ marginTop: 0 }}>Assign User to {organization.name}</h2>
+            <label className="text-muted" htmlFor="assign-user-email">Search unassigned users by email</label>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.35rem' }}>
+              <input id="assign-user-email" type="email" className="form-input" value={assignUserEmail} onChange={(event) => setAssignUserEmail(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') searchUnassignedUsers(); }} placeholder="name@example.com" style={{ flex: 1, minWidth: 0 }} />
+              <button type="button" className="action-btn secondary text-xs" onClick={searchUnassignedUsers} disabled={searchingUnassignedUsers}>{searchingUnassignedUsers ? 'Searching…' : 'Search'}</button>
+            </div>
+            <label className="text-muted" htmlFor="assign-user-role" style={{ display: 'block', marginTop: '1rem' }}>Organization role</label>
+            <select id="assign-user-role" className="form-select" value={assignUserRole} onChange={(event) => setAssignUserRole(event.target.value)} style={{ marginTop: '0.35rem' }}>
+              <option value="ISSUER">ISSUER</option>
+              <option value="MEMBER">MEMBER</option>
+            </select>
+            {assignUserError && <div role="alert" className="alert-banner danger" style={{ marginTop: '1rem' }}><AlertTriangle size={16} /><span>{assignUserError}</span></div>}
+            {unassignedUsers.length > 0 && (
+              <div style={{ marginTop: '1rem', display: 'grid', gap: '0.5rem' }}>
+                {unassignedUsers.map((user) => (
+                  <div key={user.userId || user.id || user._id} className="glass-card" style={{ padding: '0.75rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', borderColor: 'rgba(139, 92, 246,  0.25)' }}>
+                    <div><strong style={{ display: 'block' }}>{user.name}</strong><span className="text-muted">{user.email}</span></div>
+                    <button type="button" className="action-btn primary text-xs" onClick={() => handleAssignOrganizationUser(user)}>Assign</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '1.25rem' }}>
+              <button type="button" className="action-btn secondary text-xs" onClick={() => setShowAssignUserModal(false)} disabled={searchingUnassignedUsers}>Close</button>
             </div>
           </section>
         </div>
