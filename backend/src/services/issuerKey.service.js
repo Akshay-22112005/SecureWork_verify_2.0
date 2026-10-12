@@ -99,13 +99,21 @@ class IssuerKeyService {
    * @returns {Promise<object>} Newly generated active IssuerKey
    */
   async rotateIssuerKey(issuerId, actorUser) {
-    await this.checkAuthorization(issuerId, actorUser);
-
     const issuer = await Issuer.findOne({
       $or: [{ issuerId }, { issuerCode: issuerId }]
     });
     if (!issuer) {
       throw new NotFoundError('Issuer profile not found', 'ISSUER_NOT_FOUND');
+    }
+
+    if (!actorUser) {
+      throw new ForbiddenError('Authenticated user required', 'UNAUTHORIZED');
+    }
+
+    if (actorUser.role !== 'ADMIN') {
+      if (issuer.userId !== actorUser.userId) {
+        throw new ForbiddenError('You do not have permission to rotate keys for this issuer', 'FORBIDDEN');
+      }
     }
 
     if (issuer.status !== 'ACTIVE') {

@@ -270,7 +270,7 @@ async function seedDatabase(options = {}) {
         originalFilename: filename,
         mimeType: 'application/pdf',
         fileSize: content.length,
-        storagePath: docPath,
+        storagePath: path.basename(docPath),
         sha256Hash: hash,
         hashAlgorithm: 'SHA-256',
         uploadedBy: recipientUser.userId,

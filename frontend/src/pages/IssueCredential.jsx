@@ -108,7 +108,17 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
     if (!selectedIssuerId || !recipientId || !documentId || !title) { setError("Please fill in all required fields."); return; }
     setError(""); setLoading(true); setIssuedResult(null);
     try {
-      const res = await api.credentials.issue({ issuerId: selectedIssuerId, recipientId: recipientId.trim(), documentId: documentId.trim(), credentialType, title: title.trim(), validityDays: Number(validityDays) || 365 });
+      const vDays = Number(validityDays) || 365;
+      const payload = {
+        issuerId: selectedIssuerId,
+        recipientId: recipientId.trim(),
+        documentId: documentId.trim(),
+        credentialType,
+        title: title.trim(),
+        validityDays: vDays,
+        expiresAt: new Date(Date.now() + vDays * 86400000).toISOString()
+      };
+      const res = await api.credentials.issue(payload);
       if (res && res.success) setIssuedResult(res.data);
       else setError(res?.error?.message || "Failed to issue credential");
     } catch (err) { setError(err.message || "Issuance request failed"); }
@@ -137,14 +147,18 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
     if (!csvRows.length || !bulkIssuerId) { setBulkError("Upload a CSV file and select an issuer first."); return; }
     setBulkError(""); setBulkLoading(true); setBulkResults(null);
     try {
-      const credentials = csvRows.map((row) => ({
-        issuerId: bulkIssuerId,
-        recipientId: row.recipientId || row.recipient_id || "",
-        documentId: row.documentId || row.document_id || "",
-        credentialType: row.credentialType || row.credential_type || "OTHER",
-        title: row.title || "",
-        validityDays: Number(row.validityDays || row.validity_days) || 365
-      }));
+      const credentials = csvRows.map((row) => {
+        const vDays = Number(row.validityDays || row.validity_days) || 365;
+        return {
+          issuerId: bulkIssuerId,
+          recipientId: row.recipientId || row.recipient_id || "",
+          documentId: row.documentId || row.document_id || "",
+          credentialType: row.credentialType || row.credential_type || "OTHER",
+          title: row.title || "",
+          validityDays: vDays,
+          expiresAt: new Date(Date.now() + vDays * 86400000).toISOString()
+        };
+      });
       const res = await api.credentials.bulkIssue({ credentials });
       if (res && res.success) { setBulkResults(res.data); setShowResultDetail(true); }
       else setBulkError(res?.error?.message || "Bulk issuance failed");

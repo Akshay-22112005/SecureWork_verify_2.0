@@ -7,6 +7,10 @@ const User = require('../models/user.model');
 const issuerKeyService = require('./issuerKey.service');
 const auditService = require('./audit.service');
 const notificationService = require('./notification.service');
+const emailService = require('./email.service');
+const webhookService = require('./webhook.service');
+const env = require('../config/env');
+const logger = require('../utils/logger');
 const { buildCanonicalPayload } = require('../utils/credentialPayload');
 const { ValidationError, NotFoundError, ForbiddenError } = require('../utils/errors');
 const { CREDENTIAL_TYPES } = require('../models/credential.model');
@@ -38,11 +42,21 @@ class CredentialService {
    * Helper to check read access to a credential.
    * Allowed: Recipient subject, Issuer owner, ADMIN, or AUDITOR.
    */
-  checkReadAccess(credential, user) {
-    if (!user) return true; // Public verification allowed
-    if (['ADMIN', 'AUDITOR', 'ISSUER'].includes(user.role)) return true;
-    if (credential.recipientId === user.userId) return true;
-    return true; // Credentials can be viewed for verification
+  async checkReadAccess(credential, user) {
+    if (!user) {
+      throw new ForbiddenError('Authenticated user required to view this credential', 'UNAUTHORIZED');
+    }
+    if (['ADMIN', 'AUDITOR', 'HR'].includes(user.role)) {
+      return true;
+    }
+    if (credential.recipientId === user.userId) {
+      return true;
+    }
+    const issuer = await Issuer.findOne({ userId: user.userId });
+    if (issuer && issuer.issuerId === credential.issuerId) {
+      return true;
+    }
+    throw new ForbiddenError('Access denied: You do not have permission to view this credential', 'FORBIDDEN');
   }
 
   /**
@@ -75,7 +89,7 @@ class CredentialService {
    * @returns {Promise<{ credential: object, version: object }>}
    */
   async issueCredential(params, actorUser) {
-    const { issuerId, recipientId, documentId, credentialType, title, expiresAt } = params;
+    const { issuerId, recipientId, documentId, credentialType, title, expiresAt, validityDays } = params;
 
     if (!issuerId) throw new ValidationError('Issuer ID is required');
     if (!recipientId) throw new ValidationError('Recipient ID is required');
@@ -138,7 +152,20 @@ class CredentialService {
     const credentialId = `crd_${crypto.randomBytes(8).toString('hex')}`;
     const versionId = `ver_${crypto.randomBytes(8).toString('hex')}`;
     const issuedAt = new Date();
-    const expiryDate = expiresAt ? new Date(expiresAt) : null;
+    let expiryDate = null;
+    if (expiresAt) {
+      const parsed = new Date(expiresAt);
+      if (Number.isNaN(parsed.getTime())) {
+        throw new ValidationError('expiresAt must be a valid date', 'INVALID_EXPIRES_AT');
+      }
+      expiryDate = parsed;
+    } else if (validityDays !== undefined && validityDays !== null && validityDays !== '') {
+      const days = parseInt(validityDays, 10);
+      if (Number.isNaN(days) || days <= 0) {
+        throw new ValidationError('validityDays must be a positive integer', 'INVALID_VALIDITY_DAYS');
+      }
+      expiryDate = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    }
 
     // 5. Construct authoritative 9-field canonical payload
     const canonicalPayload = buildCanonicalPayload({
@@ -210,6 +237,17 @@ class CredentialService {
       severity: 'SUCCESS',
       data: { credentialId, issuerId: issuer.issuerId, credentialType }
     });
+
+    emailService.sendCredentialIssuedEmail(
+      recipient,
+      credential
+    ).catch((err) => logger.warn(`Credential issued email skipped: ${err.message}`));
+
+    webhookService.dispatchEvent('credential.issued', {
+      credentialId,
+      recipientId: recipient.userId,
+      issuerId: issuer.issuerId
+    }).catch((err) => logger.warn(`Credential issued webhook skipped: ${err.message}`));
 
     return {
       credential: credential.toJSON(),
@@ -400,6 +438,9 @@ class CredentialService {
       data: { credentialId, reason }
     });
 
+    webhookService.dispatchEvent('credential.revoked', { credentialId, reason })
+      .catch((err) => logger.warn(`Credential revoked webhook skipped: ${err.message}`));
+
     return credential.toJSON();
   }
 
@@ -415,7 +456,7 @@ class CredentialService {
       throw new NotFoundError('Credential not found', 'CREDENTIAL_NOT_FOUND');
     }
 
-    this.checkReadAccess(credential, user);
+    await this.checkReadAccess(credential, user);
 
     const currentVersion = await CredentialVersion.findOne({
       versionId: credential.currentVersionId
@@ -439,7 +480,7 @@ class CredentialService {
       throw new NotFoundError('Credential not found', 'CREDENTIAL_NOT_FOUND');
     }
 
-    this.checkReadAccess(credential, user);
+    await this.checkReadAccess(credential, user);
 
     const versions = await CredentialVersion.find({ credentialId }).sort({ versionNumber: 1 });
     return versions.map(v => v.toJSON());
@@ -463,9 +504,13 @@ class CredentialService {
     if (filters.credentialType) query.credentialType = filters.credentialType;
     if (filters.status) query.status = filters.status;
 
-    // Scoping for regular USER (can only view credentials issued to them)
+    // Scoping: USER sees own wallet; ISSUER sees credentials they issued.
+    // ADMIN, AUDITOR, and HR retain directory access for verification/compliance.
     if (user && user.role === 'USER') {
       query.recipientId = user.userId;
+    } else if (user && user.role === 'ISSUER') {
+      const issuer = await Issuer.findOne({ userId: user.userId });
+      query.issuerId = issuer ? issuer.issuerId : '__none__';
     }
 
     const [creds, total] = await Promise.all([
@@ -493,7 +538,7 @@ class CredentialService {
       throw new NotFoundError('Credential not found', 'CREDENTIAL_NOT_FOUND');
     }
 
-    this.checkReadAccess(credential, user);
+    await this.checkReadAccess(credential, user);
 
     const versions = await CredentialVersion.find({ credentialId }).sort({ versionNumber: 1 });
     const auditEvents = await auditService.getResourceAuditTrail(credentialId);
@@ -576,8 +621,15 @@ class CredentialService {
         const email = (row.recipientEmail || row.email || '').trim().toLowerCase();
         const name = (row.recipientName || row.name || 'Recipient').trim();
         const title = (row.title || '').trim();
-        const credentialType = (row.credentialType || 'CERTIFICATION').toUpperCase();
-        const expiresAt = row.expiresAt ? new Date(row.expiresAt) : null;
+        let expiresAt = null;
+        if (row.expiresAt) {
+          expiresAt = new Date(row.expiresAt);
+        } else if (row.validityDays !== undefined && row.validityDays !== null && row.validityDays !== '') {
+          const vDays = parseInt(row.validityDays, 10);
+          if (!Number.isNaN(vDays) && vDays > 0) {
+            expiresAt = new Date(Date.now() + vDays * 86400000);
+          }
+        }
 
         if (!email || !title) {
           throw new ValidationError('recipientEmail and title are required');

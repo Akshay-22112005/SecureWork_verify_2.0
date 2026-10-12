@@ -7,6 +7,7 @@ const verificationService = require('./verification.service');
 const verificationEngine = require('./verification/verificationEngine');
 const auditService = require('./audit.service');
 const { NotFoundError, ValidationError, ForbiddenError } = require('../utils/errors');
+const notificationService = require('./notification.service');
 
 /**
  * HR Persona Service
@@ -130,6 +131,16 @@ class HrService {
       }
     );
 
+    // HR inspection notification to candidate
+    await notificationService.notifyUser({
+      recipientUserId: subject.userId,
+      type: 'SYSTEM_ALERT',
+      title: 'Credential Record Inspected',
+      message: `An authorized HR representative (${actorUser.email}) inspected your credential records.`,
+      severity: 'INFO',
+      data: { link: '/credentials' }
+    });
+
     return {
       subject: {
         userId: subject.userId,
@@ -199,6 +210,16 @@ class HrService {
         actorRole: actorUser.role
       }
     );
+
+    // HR verification notification to candidate
+    await notificationService.notifyUser({
+      recipientUserId: subjectUser ? subjectUser.userId : credential.recipientId,
+      type: 'SYSTEM_ALERT',
+      title: 'Credential Record Inspected',
+      message: `An authorized HR representative (${actorUser.email}) inspected your credential records.`,
+      severity: 'INFO',
+      data: { link: '/credentials' }
+    });
 
     return verificationResult;
   }

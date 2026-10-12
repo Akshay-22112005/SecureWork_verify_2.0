@@ -23,7 +23,7 @@ class DocumentService {
       throw new ForbiddenError('Authenticated user required', 'UNAUTHORIZED');
     }
     // Privileged platform roles can access for verification/audit
-    if (['ADMIN', 'AUDITOR', 'ISSUER'].includes(user.role)) {
+    if (['ADMIN', 'AUDITOR', 'ISSUER', 'HR'].includes(user.role)) {
       return true;
     }
     // Document owner

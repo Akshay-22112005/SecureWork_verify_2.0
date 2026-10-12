@@ -8,8 +8,8 @@ const router = express.Router();
 router.get('/', organizationController.listOrganizations);
 router.get('/:id', organizationController.getOrganization);
 
-// Protected routes (creation requires active user)
-router.post('/', authenticateUser, organizationController.createOrganization);
+// Admin-only creation route
+router.post('/', authenticateUser, requireRole('ADMIN'), organizationController.createOrganization);
 
 // Admin-only Trust Lifecycle Management
 router.post('/:id/verify', authenticateUser, requireRole('ADMIN'), organizationController.verifyOrganization);

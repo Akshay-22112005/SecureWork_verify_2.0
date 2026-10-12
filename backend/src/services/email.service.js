@@ -24,24 +24,27 @@ class EmailService {
         }
       });
     } else {
-      // Create Ethereal test account or JSON transport
-      try {
-        const testAccount = await nodemailer.createTestAccount();
-        this.transporter = nodemailer.createTransport({
-          host: 'smtp.ethereal.email',
-          port: 5887,
-          secure: false,
-          auth: {
-            user: testAccount.user,
-            pass: testAccount.pass
-          }
-        });
-        logger.info(`Ethereal test SMTP initialized: ${testAccount.user}`);
-      } catch {
-        // Fallback to JSON transport
-        this.transporter = nodemailer.createTransport({
-          jsonTransport: true
-        });
+      // In test environment, directly use JSON transport to avoid external SMTP
+      if (process.env.NODE_ENV === 'test') {
+        this.transporter = nodemailer.createTransport({ jsonTransport: true });
+      } else {
+        // Create Ethereal test account or fallback to JSON transport
+        try {
+          const testAccount = await nodemailer.createTestAccount();
+          this.transporter = nodemailer.createTransport({
+            host: 'smtp.ethereal.email',
+            port: 5887,
+            secure: false,
+            auth: {
+              user: testAccount.user,
+              pass: testAccount.pass
+            }
+          });
+          logger.info(`Ethereal test SMTP initialized: ${testAccount.user}`);
+        } catch {
+          // Fallback to JSON transport
+          this.transporter = nodemailer.createTransport({ jsonTransport: true });
+        }
       }
     }
   }
@@ -69,26 +72,60 @@ class EmailService {
       return info;
     } catch (err) {
       logger.warn(`Email sending failed: ${err.message}`);
+      // If not already using JSON transport, fallback and retry once
+      if (!this.transporter || (this.transporter.options && !this.transporter.options.jsonTransport)) {
+        this.transporter = nodemailer.createTransport({ jsonTransport: true });
+        try {
+          const retryInfo = await this.transporter.sendMail({
+            from: '"SecureWork Verify" <no-reply@securework.io>',
+            to,
+            subject,
+            text,
+            html
+          });
+          const previewUrl = nodemailer.getTestMessageUrl(retryInfo);
+          if (previewUrl) {
+            logger.info(`[Email Preview after fallback]: ${previewUrl}`);
+          }
+          return retryInfo;
+        } catch (fallbackErr) {
+          logger.warn(`Fallback JSON email also failed: ${fallbackErr.message}`);
+        }
+      }
     }
   }
 
-  async sendCredentialIssuedEmail(recipientEmail, recipientName, credentialTitle, verifyUrl) {
+  async sendCredentialIssuedEmail(recipientEmailOrUser, recipientNameOrCred, credentialTitle, verifyUrl) {
+    let email, name, title, url;
+    if (typeof recipientEmailOrUser === 'object' && recipientEmailOrUser !== null) {
+      email = recipientEmailOrUser.email;
+      name = recipientEmailOrUser.name || recipientEmailOrUser.fullName || 'Recipient';
+      const cred = recipientNameOrCred || {};
+      title = cred.title || cred.credentialType || 'Workforce Credential';
+      url = `${env.FRONTEND_URL}/verify/${cred.credentialId}`;
+    } else {
+      email = recipientEmailOrUser;
+      name = recipientNameOrCred;
+      title = credentialTitle;
+      url = verifyUrl;
+    }
+
     const html = `
       <div style="font-family: Arial, sans-serif; background-color: #0b1120; color: #e2e8f0; padding: 24px; border-radius: 8px;">
         <h2 style="color: #38bdf8;">SecureWork Verify — New Credential Issued</h2>
-        <p>Hello <strong>${recipientName}</strong>,</p>
+        <p>Hello <strong>${name}</strong>,</p>
         <p>A new cryptographically verifiable credential has been issued to your portfolio:</p>
         <div style="background-color: #1e293b; padding: 16px; border-radius: 6px; border-left: 4px solid #06b6d4; margin: 16px 0;">
-          <h3 style="margin: 0; color: #f8fafc;">${credentialTitle}</h3>
+          <h3 style="margin: 0; color: #f8fafc;">${title}</h3>
         </div>
         <p>You can view and verify your credential certificate online:</p>
-        <a href="${verifyUrl}" style="background-color: #06b6d4; color: #000; padding: 10px 18px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">View Public Certificate</a>
+        <a href="${url}" style="background-color: #06b6d4; color: #000; padding: 10px 18px; text-decoration: none; border-radius: 4px; font-weight: bold; display: inline-block;">View Public Certificate</a>
       </div>
     `;
     return this.sendEmail({
-      to: recipientEmail,
-      subject: `New Credential Issued: ${credentialTitle}`,
-      text: `Hello ${recipientName}, a new credential (${credentialTitle}) was issued to you. Verify at: ${verifyUrl}`,
+      to: email,
+      subject: `New Credential Issued: ${title}`,
+      text: `Hello ${name}, a new credential (${title}) was issued to you. Verify at: ${url}`,
       html
     });
   }

@@ -15,18 +15,29 @@ async function uploadAndAnalyze(req, res, next) {
     }
 
     // 1. Ingest document
+    const representationType = (req.body.representationType === 'ORIGINAL_PDF' || !req.body.representationType)
+      ? 'ORIGINAL_DIGITAL_FILE'
+      : req.body.representationType;
+
+    const uploader = req.user || {
+      userId: 'usr_public_anonymous',
+      uploadedBy: 'usr_public_anonymous',
+      role: 'USER',
+      name: 'Anonymous Public Uploader'
+    };
+
     const document = await documentService.ingestDocument(
       {
         file: req.file,
-        representationType: req.body.representationType || 'ORIGINAL_PDF'
+        representationType
       },
-      req.user
+      uploader
     );
 
     // 2. Execute OCR analysis
     let ocrAnalysis = null;
     try {
-      ocrAnalysis = await ocrService.analyzeDocument(document.documentId, req.body.options || {}, req.user);
+      ocrAnalysis = await ocrService.analyzeDocument(document.documentId, req.body.options || {}, uploader);
     } catch (err) {
       ocrAnalysis = { status: 'FAILED', errorReason: err.message };
     }
@@ -34,7 +45,7 @@ async function uploadAndAnalyze(req, res, next) {
     // 3. Execute AI tamper analysis
     let aiAnalysis = null;
     try {
-      aiAnalysis = await aiService.analyzeDocument(document.documentId, req.body.options || {}, req.user);
+      aiAnalysis = await aiService.analyzeDocument(document.documentId, req.body.options || {}, uploader);
     } catch (err) {
       aiAnalysis = { status: 'FAILED', errorReason: err.message };
     }

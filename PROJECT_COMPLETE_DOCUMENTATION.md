@@ -55,7 +55,10 @@
 44. [Technical Interview Questions & Codebase Answers](#44-technical-interview-questions--codebase-answers)
 45. ["Where Is This Implemented?" Reference](#45-where-is-this-implemented-reference)
 46. [Final Architecture Summary](#46-final-architecture-summary)
-47. [Documentation Generation Report](#documentation-generation-report)
+47. [HR Persona Service](#47-hr-persona-service)
+48. [Notification System](#48-notification-system)
+49. [Login UI & Domain Feedback Enhancements](#49-login-ui--domain-feedback-enhancements)
+50. [Documentation Generation Report](#documentation-generation-report)
 
 ---
 
@@ -2325,18 +2328,117 @@ By eliminating all external paid API dependencies and blockchain overhead, Secur
 
 ---
 
+# 47. HR PERSONA SERVICE
+
+The **HR Persona Service** (`backend/src/services/hr.service.js`) provides a dedicated, compliance-aware interface for Human Resources professionals to perform candidate due diligence without direct access to the full credential administration system.
+
+### Capabilities
+
+| Action | Endpoint | Required Role |
+|---|---|---|
+| Candidate lookup by userId or email | `GET /api/hr/subjects/:userIdOrEmail/credentials` | ADMIN, HR |
+| HR-initiated credential verification | `POST /api/hr/verify` | ADMIN, HR |
+
+### Implementation Details
+
+- **Candidate Subject Lookup:** Accepts either a MongoDB `userId`, a 24-character ObjectId, or an email address. The service normalises the identifier, queries `User`, and returns all associated `Credential` documents enriched with issuer profile, organization status, active key lifecycle, and a summarised trust evaluation.
+- **Issuer Enrichment:** For each credential, the service fetches the linked `Issuer` and `Organization` records, attaching display name, verification status, and domain binding to the credential response. This gives HR reviewers full institutional context in a single API call.
+- **HR-Initiated Verification:** Delegates to `verification.service.js` and the full 16-dimension `VerificationEngine`, ensuring that HR-triggered verifications are recorded in the audit log with the actor's user ID and are subject to exactly the same cryptographic checks as automated verifications.
+- **Audit Logging:** Every HR lookup and verification event is appended to the hash-chained `AuditLog` with `actorId`, `action`, `targetId`, and `metadata`, providing a full, tamper-evident compliance trail.
+- **Rate Limiting:** All HR routes are protected by a dedicated `hrRateLimiter` (60 requests/minute) created via the `createRateLimiter` factory in `middleware/rateLimiter.js`.
+- **Role Guard:** All HR routes require `authenticateUser` + `requireRole('ADMIN', 'HR')` — the `HR` role is a first-class role defined in `frontend/src/config/permissions.js` and enforced both in the Express middleware layer and in the React `RoleRoute` component.
+
+### Files
+
+| File | Purpose |
+|---|---|
+| `backend/src/services/hr.service.js` | Core HR business logic — candidate lookup, enrichment, audit logging |
+| `backend/src/controllers/hr.controller.js` | Thin Express controller — request parsing and response formatting |
+| `backend/src/routes/hr.routes.js` | Route definitions with auth + role + rate-limit middleware stack |
+
+---
+
+# 48. NOTIFICATION SYSTEM
+
+The **Notification System** provides in-app, real-time-adjacent alerts for candidates, issuers, and HR users about credential lifecycle events.
+
+### Architecture
+
+```
+Credential / HR Event
+    ↓
+notification.service.js  →  notification adapter (local / remote)
+    ↓                               ↓
+Notification model (MongoDB)   email.service.js (Nodemailer)
+    ↓
+REST API GET /api/notifications
+    ↓
+NotificationContext.jsx  →  NotificationDrawer.jsx
+```
+
+### Notification Types
+
+| Type | Trigger | Recipient |
+|---|---|---|
+| `CREDENTIAL_ISSUED` | New credential issued to subject | Credential recipient (candidate) |
+| `CREDENTIAL_REVOKED` | Credential revoked by issuer | Credential recipient |
+| `VERIFICATION_COMPLETE` | Verification submitted | Requester |
+| `HR_LOOKUP` | HR queried subject credentials | Subject (candidate) |
+
+### Implementation Details
+
+- **Notification Model** (`backend/src/models/notification.model.js`): Schema includes `notificationId`, `recipientId`, `type`, `message`, `read` (boolean), `metadata` (arbitrary JSON), and `createdAt`/`updatedAt` timestamps.
+- **Service Layer** (`backend/src/services/notification.service.js`): `createNotification`, `listNotifications` (paginated), `markRead`, `markAllRead`.
+- **Adapter Pattern:** The notification delivery layer uses the same adapter pattern as OCR, storage, and AI. The `localNotification.adapter.js` writes directly to MongoDB; a remote adapter could be swapped in for push notifications.
+- **Frontend Context** (`frontend/src/context/NotificationContext.jsx`): Polls or listens for notification badge count updates; propagates `unreadCount` to `Navbar.jsx`.
+- **Notification Drawer** (`frontend/src/components/NotificationDrawer.jsx`): Slide-out panel displaying the full notification list with inline mark-read and mark-all-read controls.
+
+### API Endpoints
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/notifications` | List notifications for authenticated user (paginated) |
+| `PATCH` | `/api/notifications/:id/read` | Mark single notification as read |
+| `PATCH` | `/api/notifications/read-all` | Mark all notifications as read |
+
+---
+
+# 49. LOGIN UI & DOMAIN FEEDBACK ENHANCEMENTS
+
+The Login page (`frontend/src/pages/Login.jsx`) was enhanced as part of the Auth UI Cleanup initiative.
+
+### Changes Made
+
+| Feature | Description |
+|---|---|
+| **Demo Persona Switcher Removal** | The interactive persona switcher widget that pre-filled role selections was removed. Roles are now fetched strictly from the database upon login. |
+| **Preset Test Credentials Box** | A compact "Preset Test Credentials" quick-fill section replaces the old persona switcher. Buttons auto-fill email/password fields for the three seeded test accounts (Admin, Auditor, User) without hard-coding role assumptions. |
+| **Session Expiry Banner** | When the user is redirected to `/login` with `location.state.sessionExpired = true`, a yellow warning banner displays "Your session has expired. Please sign in again." |
+| **Persona Mismatch Banner** | When navigating from a persona-gated route, an informational banner explains which role is required and why the user must sign in with the appropriate account. |
+| **Password Visibility Toggle** | Eye / EyeOff icon button toggles input `type` between `password` and `text` for accessible password visibility. |
+| **Remember Me Checkbox** | Checkbox controls whether the JWT is stored in `localStorage` (persistent) or `sessionStorage` (session-only). The inline hint text updates dynamically. |
+| **Role-based Post-Login Redirect** | On successful login, `getDefaultDashboard(user.role)` from `frontend/src/config/permissions.js` routes each role to its appropriate dashboard without hard-coded path strings. |
+
+### Preserved Constraints
+
+- No role selector dropdown added to the login form. Roles are **always** fetched from the database via the JWT payload returned by `POST /api/auth/login`.
+- JWT authentication and database-driven RBAC in `backend/src/services/auth.service.js` and `frontend/src/context/AuthContext.jsx` are **unchanged**.
+
+---
+
 # DOCUMENTATION GENERATION REPORT
 
-- **Total Files Inspected in Repository:** 142 files (excluding `node_modules` and `.git`).
-- **Number of Frontend Files Inspected:** 48 source files (`frontend/src/` pages, components, context, services, styles).
-- **Number of Backend Files Inspected:** 74 source files (`backend/src/` controllers, services, models, routes, utils, adapters, configs).
+- **Total Files Inspected in Repository:** 212 files (excluding `node_modules` and `.git`) — fully documented in `FILE_AUDIT_REPORT.md`.
+- **Number of Frontend Files Inspected:** 71 source files (`frontend/src/` — 23 pages, 23 components, 3 contexts, 2 services, 1 layout, 4 hooks, 8 styles, 3 config/entry).
+- **Number of Backend Files Inspected:** 121 source files (`backend/src/` — 20 routes, 18 controllers, 19 models, 22 services, 23 adapter files, 13 utils, 2 config, 2 entry, 2 root adapters).
 - **Number of Mongoose Models Found & Documented:** 17 models (`User`, `Organization`, `Issuer`, `IssuerKey`, `Document`, `Credential`, `CredentialVersion`, `Verification`, `VerificationEvidence`, `TrustedSource`, `OcrAnalysis`, `AIAnalysis`, `AuditLog`, `AuditCheckpoint`, `Notification`, `ApiKey`, `Webhook`).
-- **Number of API Endpoints Documented:** 85 implemented REST routes across 19 route modules.
+- **Number of API Endpoints Documented:** 87 implemented REST routes across 20 route modules (added: `hr.routes.js` with 2 endpoints).
 - **Number of External / Adapter Integrations Found:** 4 (Cloudinary remote storage, Tesseract.js local OCR, Nodemailer / Ethereal email, native Node.js crypto engine).
 - **Cryptographic Mechanisms Found & Verified:** 6 (SHA-256, Ed25519, HMAC-SHA256, RFC 8785 JCS, `timingSafeEqual`, sequential hash chaining).
 - **Database Technologies Found:** 2 (MongoDB via Mongoose ODM with automated `mongodb-memory-server` in-memory fallback).
 - **Authentication Mechanisms Found:** JWT Bearer tokens (HS256, 24h expiration) + salted bcrypt password hashing (10 rounds).
 - **AI / OCR Technologies Found:** Tesseract.js v7 offline worker + PDF stream parser + `LocalAIAdapter` heuristic binary/metadata classifier.
-- **Major Implemented Features Verified:** 16-check verification engine, offline CLI bundle verification, PDFKit certificate generator with QR codes, W3C JSON-LD export, SSRF defensive HTTP client, B2B API keys, HMAC-signed webhooks, hash-chained audit ledger.
-- **Areas of Limitation Confirmed:** In-memory rate limiting and in-process webhook delivery (suitable for single-node / horizontal scaling requires Redis); local filesystem key storage (production recommendation: HSM/KMS).
-- **Documentation Verification:** Completed and written to single self-contained file `PROJECT_COMPLETE_DOCUMENTATION.md` in repository root.
+- **Major Implemented Features Verified:** 16-check verification engine, offline CLI bundle verification, PDFKit certificate generator with QR codes, W3C JSON-LD export, SSRF defensive HTTP client, B2B API keys, HMAC-signed webhooks, hash-chained audit ledger, HR persona service with candidate lookup and compliance audit logging, in-app notification system with drawer UI, login UI enhancements (session expiry banner, remember-me, password visibility toggle, preset test credentials).
+- **Areas of Limitation Confirmed:** In-memory rate limiting and in-process webhook delivery (suitable for single-node / horizontal scaling requires Redis); local filesystem key storage (production recommendation: HSM/KMS); OCR accuracy limited to printed text (handwriting requires cloud OCR).
+- **Documentation Last Updated:** 2026-10-11. All changes from Master Repair, Master Implementation (Auth UI + HR Notifications), and full file audit passes are reflected.
+- **Documentation Verification:** Completed and written to single self-contained file `PROJECT_COMPLETE_DOCUMENTATION.md` in repository root. Full per-file inventory is maintained in `FILE_AUDIT_REPORT.md`.

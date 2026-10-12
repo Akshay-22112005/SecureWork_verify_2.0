@@ -6,6 +6,7 @@ const { sha256 } = require('../utils/crypto');
 const auditService = require('./audit.service');
 const { NotFoundError, ValidationError } = require('../utils/errors');
 const logger = require('../utils/logger');
+const env = require('../config/env');
 
 /**
  * OCR Analysis Service
@@ -24,6 +25,13 @@ class OcrService {
    * @returns {Promise<object>}
    */
   async analyzeDocument(documentId, options = {}, user = null) {
+    if (env.OCR_ENABLED === false) {
+      return {
+        status: 'UNAVAILABLE',
+        message: 'OCR service disabled by system configuration'
+      };
+    }
+
     if (!documentId) {
       throw new ValidationError('documentId is required for OCR analysis');
     }

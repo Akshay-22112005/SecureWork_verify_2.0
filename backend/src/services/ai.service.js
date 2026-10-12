@@ -6,6 +6,7 @@ const { getStorageAdapter } = require('./storage');
 const auditService = require('./audit.service');
 const { NotFoundError, ValidationError } = require('../utils/errors');
 const logger = require('../utils/logger');
+const env = require('../config/env');
 
 /**
  * AI Analysis Service.
@@ -22,6 +23,13 @@ class AIService {
    * @returns {Promise<object>}
    */
   async analyzeDocument(documentId, options = {}, user = null) {
+    if (env.AI_ENABLED === false) {
+      return {
+        status: 'UNAVAILABLE',
+        message: 'AI service disabled by system configuration'
+      };
+    }
+
     if (!documentId) {
       throw new ValidationError('documentId is required for AI analysis');
     }

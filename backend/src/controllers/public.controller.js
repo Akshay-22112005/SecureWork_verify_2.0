@@ -1,5 +1,8 @@
 const QRCode = require('qrcode');
+const OcrAnalysis = require('../models/ocrAnalysis.model');
+const AIAnalysis = require('../models/aiAnalysis.model');
 const Credential = require('../models/credential.model');
+const CredentialVersion = require('../models/credentialVersion.model');
 const Issuer = require('../models/issuer.model');
 const IssuerKey = require('../models/issuerKey.model');
 const Organization = require('../models/organization.model');
@@ -40,28 +43,47 @@ class PublicController {
         credentialId: credential.credentialId
       });
 
+      const cryptographicStatus = evalResult.checks?.digitalSignature?.passed ? 'PASSED' : 'FAILED';
+      const documentStatus = evalResult.checks?.documentIntegrity?.passed ? 'PASSED' : 'FAILED';
+
       // 2. Fetch issuer & organization accreditation
+      const activeVersion = credential.currentVersionId
+        ? await CredentialVersion.findOne({ versionId: credential.currentVersionId })
+        : null;
       const issuer = await Issuer.findOne({ issuerId: credential.issuerId });
       const organization = issuer ? await Organization.findOne({ organizationId: issuer.organizationId }) : null;
       const recipient = await User.findOne({ userId: credential.recipientId });
-      const activeKey = await IssuerKey.findOne({ keyId: credential.issuerKeyId });
+      const issuerKeyId = activeVersion?.issuerKeyId || credential.issuerKeyId;
+      const activeKey = issuerKeyId ? await IssuerKey.findOne({ keyId: issuerKeyId }) : null;
+
+        // Fetch latest OCR and AI analysis for confidence metrics
+        let ocrConf = null;
+        let aiRisk = null;
+        if (activeVersion?.documentId) {
+          const [ocrRec, aiRec] = await Promise.all([
+            OcrAnalysis.findOne({ documentId: activeVersion.documentId }).sort({ ocrTimestamp: -1 }),
+            AIAnalysis.findOne({ documentId: activeVersion.documentId }).sort({ createdAt: -1 })
+          ]);
+          if (ocrRec) ocrConf = ocrRec.confidence;
+          if (aiRec) aiRisk = { riskLevel: aiRec.riskLevel, riskScore: aiRec.riskScore };
+        }
       const lastAuditEntry = await AuditLog.findOne({ targetId: credential.credentialId }).sort({ sequenceNumber: -1 });
 
       // Calculate explainable confidence breakdown
       const breakdown = {
         cryptographicSignature: {
-          passed: evalResult.cryptographicStatus === 'PASSED',
+          passed: cryptographicStatus === 'PASSED',
           weight: 40,
-          score: evalResult.cryptographicStatus === 'PASSED' ? 40 : 0,
-          description: evalResult.cryptographicStatus === 'PASSED'
+          score: cryptographicStatus === 'PASSED' ? 40 : 0,
+          description: cryptographicStatus === 'PASSED'
             ? 'Mathematically authentic Ed25519 digital signature verified against issuer public key'
             : 'Signature validation failed — potential document or metadata alteration'
         },
         documentIntegrity: {
-          passed: evalResult.documentStatus === 'PASSED',
+          passed: documentStatus === 'PASSED',
           weight: 20,
-          score: evalResult.documentStatus === 'PASSED' ? 20 : 0,
-          description: evalResult.documentStatus === 'PASSED'
+          score: documentStatus === 'PASSED' ? 20 : 0,
+          description: documentStatus === 'PASSED'
             ? 'SHA-256 binary hash matches authoritative ingest digest'
             : 'Document content digest mismatch'
         },
@@ -93,14 +115,26 @@ class PublicController {
           advisory: true,
           status: 'ADVISORY_ONLY',
           description: 'Document OCR heuristics evaluated (Advisory only — non-cryptographic)'
+        },
+        ocrConfidence: {
+          passed: true,
+          weight: 10,
+          score: ocrConf != null ? Math.round(ocrConf * 0.1) : 0,
+          description: `OCR confidence ${ocrConf != null ? ocrConf + '%' : 'N/A'}`
+        },
+        aiTamperAdvisory: {
+          advisory: true,
+          status: 'ADVISORY_ONLY',
+          description: `AI tamper analysis advisory: risk level ${aiRisk?.riskLevel || 'N/A'}, score ${aiRisk?.riskScore != null ? aiRisk.riskScore : 'N/A'}`
         }
       };
 
       const totalScore = breakdown.cryptographicSignature.score +
-        breakdown.documentIntegrity.score +
-        breakdown.revocationStatus.score +
-        breakdown.issuerAccreditation.score +
-        breakdown.auditChainIntegrity.score;
+  breakdown.documentIntegrity.score +
+  breakdown.revocationStatus.score +
+  breakdown.issuerAccreditation.score +
+  breakdown.auditChainIntegrity.score +
+  breakdown.ocrConfidence.score;
 
       // Privacy preservation: Mask recipient PII
       const rawName = recipient?.name || 'Authorized Recipient';
@@ -114,7 +148,7 @@ class PublicController {
         title: credential.title,
         credentialType: credential.credentialType,
         status: credential.status,
-        verified: evalResult.overallStatus === 'VERIFIED',
+        verified: evalResult.result === 'VERIFIED' || evalResult.overallStatus === 'VERIFIED',
         confidenceScore: totalScore,
         confidenceBreakdown: breakdown,
         issuedAt: credential.issuedAt,
@@ -133,11 +167,11 @@ class PublicController {
           accreditationStatus: organization?.organizationVerificationStatus || 'VERIFIED'
         },
         cryptography: {
-          algorithm: credential.signatureAlgorithm || 'Ed25519',
-          keyId: credential.issuerKeyId,
-          signatureFingerprint: credential.signature ? credential.signature.slice(0, 32) : null,
+          algorithm: activeVersion?.signatureAlgorithm || credential.signatureAlgorithm || 'Ed25519',
+          keyId: issuerKeyId,
+          signatureFingerprint: (activeVersion?.signature || credential.signature) ? (activeVersion?.signature || credential.signature).slice(0, 32) : null,
           hashAlgorithm: 'SHA-256',
-          documentHash: credential.documentHash
+          documentHash: activeVersion?.documentHash || credential.documentHash
         },
         auditProof: {
           sequenceNumber: lastAuditEntry?.sequenceNumber || null,
@@ -198,10 +232,14 @@ class PublicController {
       const credential = await Credential.findOne({ credentialId: id });
       if (!credential) throw new NotFoundError('Credential not found');
 
+      const activeVersion = credential.currentVersionId
+        ? await CredentialVersion.findOne({ versionId: credential.currentVersionId })
+        : null;
       const issuer = await Issuer.findOne({ issuerId: credential.issuerId });
       const organization = issuer ? await Organization.findOne({ organizationId: issuer.organizationId }) : null;
       const recipient = await User.findOne({ userId: credential.recipientId });
-      const activeKey = await IssuerKey.findOne({ keyId: credential.issuerKeyId });
+      const issuerKeyId = activeVersion?.issuerKeyId || credential.issuerKeyId;
+      const activeKey = issuerKeyId ? await IssuerKey.findOne({ keyId: issuerKeyId }) : null;
       const auditEntry = await AuditLog.findOne({ targetId: credential.credentialId }).sort({ sequenceNumber: -1 });
 
       const bundle = buildOfflineBundle({
@@ -230,10 +268,14 @@ class PublicController {
       const credential = await Credential.findOne({ credentialId: id });
       if (!credential) throw new NotFoundError('Credential not found');
 
+      const activeVersion = credential.currentVersionId
+        ? await CredentialVersion.findOne({ versionId: credential.currentVersionId })
+        : null;
       const issuer = await Issuer.findOne({ issuerId: credential.issuerId });
       const organization = issuer ? await Organization.findOne({ organizationId: issuer.organizationId }) : null;
       const recipient = await User.findOne({ userId: credential.recipientId });
-      const activeKey = await IssuerKey.findOne({ keyId: credential.issuerKeyId });
+      const issuerKeyId = activeVersion?.issuerKeyId || credential.issuerKeyId;
+      const activeKey = issuerKeyId ? await IssuerKey.findOne({ keyId: issuerKeyId }) : null;
 
       const w3cVc = formatToW3cVerifiableCredential({
         credential,

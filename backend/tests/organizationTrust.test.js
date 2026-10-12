@@ -98,11 +98,22 @@ describe('Phase 3 Organization Trust & Issuer Authorization Tests', () => {
       }
     };
 
-    const res = await fetch(`${baseUrl}/api/organizations`, {
+    // Non-admin receives 403
+    const forbiddenRes = await fetch(`${baseUrl}/api/organizations`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${regularToken}`
+      },
+      body: JSON.stringify(payload)
+    });
+    assert.strictEqual(forbiddenRes.status, 403);
+
+    const res = await fetch(`${baseUrl}/api/organizations`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
       },
       body: JSON.stringify(payload)
     });

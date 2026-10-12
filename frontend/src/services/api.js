@@ -46,6 +46,8 @@ export const api = {
   // Credentials
   credentials: {
     issue: (data) => apiClient('/credentials/issue', { method: 'POST', body: data }),
+    bulkIssue: (data) => apiClient('/credentials/bulk-issue', { method: 'POST', body: data }),
+    simulateTamper: (id, tamperType) => apiClient(`/credentials/${id}/simulate-tamper`, { method: 'POST', body: { tamperType } }),
     list: (params = {}) => {
       const q = new URLSearchParams(params).toString();
       return apiClient(`/credentials${q ? `?${q}` : ''}`);
@@ -180,22 +182,6 @@ export const api = {
   // Analytics
   analytics: {
     getOverview: () => apiClient('/analytics/overview')
-  },
-
-  // Credentials (Enhanced with Bulk Issue & Tamper Test)
-  credentials: {
-    issue: (data) => apiClient('/credentials/issue', { method: 'POST', body: data }),
-    bulkIssue: (data) => apiClient('/credentials/bulk-issue', { method: 'POST', body: data }),
-    simulateTamper: (id, tamperType) => apiClient(`/credentials/${id}/simulate-tamper`, { method: 'POST', body: { tamperType } }),
-    list: (params = {}) => {
-      const q = new URLSearchParams(params).toString();
-      return apiClient(`/credentials${q ? `?${q}` : ''}`);
-    },
-    getById: (id) => apiClient(`/credentials/${id}`),
-    getVersions: (id) => apiClient(`/credentials/${id}/versions`),
-    getTimeline: (id) => apiClient(`/credentials/${id}/timeline`),
-    createVersion: (id, data) => apiClient(`/credentials/${id}/versions`, { method: 'POST', body: data }),
-    revoke: (id, reason) => apiClient(`/credentials/${id}/revoke`, { method: 'PATCH', body: { reason } })
   }
 };
 

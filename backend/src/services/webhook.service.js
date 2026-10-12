@@ -1,8 +1,9 @@
 const crypto = require('crypto');
+const dns = require('dns').promises;
 const http = require('http');
 const https = require('https');
 const Webhook = require('../models/webhook.model');
-const { isPrivateIp } = require('../utils/ssrfProtection');
+const { isPrivateOrBlockedIp } = require('../utils/ssrfProtection');
 const logger = require('../utils/logger');
 
 /**
@@ -37,9 +38,16 @@ class WebhookService {
    * Dispatch an event to all subscribed active webhooks.
    */
   async dispatchEvent(eventType, payload) {
+    const eventUpper = eventType.toUpperCase();
+    const eventLower = eventType.toLowerCase();
     const webhooks = await Webhook.find({
       status: 'ACTIVE',
-      $or: [{ events: '*' }, { events: eventType }]
+      $or: [
+        { events: '*' },
+        { events: eventType },
+        { events: eventUpper },
+        { events: eventLower }
+      ]
     });
 
     for (const hook of webhooks) {
@@ -54,6 +62,22 @@ class WebhookService {
    * @private
    */
   async _sendPayload(hook, eventType, payload) {
+    const parsed = new URL(hook.url);
+
+    // SSRF IP-level check
+    try {
+      const lookupResult = await dns.lookup(parsed.hostname);
+      const ip = lookupResult.address;
+      if (isPrivateOrBlockedIp(ip)) {
+        await Webhook.updateOne({ _id: hook._id }, { $inc: { failureCount: 1 } }).exec();
+        logger.warn(`SSRF blocked for webhook ${hook.webhookId}: IP ${ip} is private or blocked`);
+        return;
+      }
+    } catch (dnsErr) {
+      await Webhook.updateOne({ _id: hook._id }, { $inc: { failureCount: 1 } }).exec();
+      throw dnsErr;
+    }
+
     const timestamp = Math.floor(Date.now() / 1000);
     const body = JSON.stringify({
       event: eventType,
@@ -66,7 +90,6 @@ class WebhookService {
       .update(`${timestamp}.${body}`)
       .digest('hex');
 
-    const parsed = new URL(hook.url);
     const client = parsed.protocol === 'https:' ? https : http;
 
     return new Promise((resolve, reject) => {
