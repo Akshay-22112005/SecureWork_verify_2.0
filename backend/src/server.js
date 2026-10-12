@@ -38,12 +38,19 @@ async function startServer() {
     }
   }
 
-  const server = app.listen(env.PORT, () => {
-    logger.info(`SecureWork Verify Backend Service listening on port ${env.PORT}`, {
-      environment: env.NODE_ENV,
-      port: env.PORT,
-      healthEndpoint: `http://localhost:${env.PORT}/api/health`
-    });
+  const MAX_PORT_RETRIES = 5;
+  let currentPort = env.PORT;
+
+  const server = await new Promise((resolve, reject) => {
+    let retries = 0;
+
+    function tryListen(port) {
+      const srv = app.listen(port, () => {
+        logger.info(`SecureWork Verify Backend Service listening on port ${port}`, {
+          environment: env.NODE_ENV,
+          port: port,
+          healthEndpoint: `http://localhost:${port}/api/health`
+        });
 
         console.log(`==================================================`);
         console.log(`  SecureWork Verify Backend Service Started`);
