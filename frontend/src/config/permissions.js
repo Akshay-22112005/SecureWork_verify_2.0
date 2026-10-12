@@ -15,7 +15,7 @@ export const ROLE_HOME_PAGES = {
   ADMIN: '/admin/users',
   ISSUER: '/issuer/status',
   AUDITOR: '/audit/logs',
-  HR: '/trusted-sources/verify',
+  HR: '/verify',
   USER: '/dashboard'
 };
 

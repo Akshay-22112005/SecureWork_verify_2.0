@@ -25,6 +25,9 @@ export default function Login({ onNavigate }) {
   const fromPath = location.state?.from?.pathname || null;
   const prefillCredentialId = location.state?.credentialId || null;
 
+  // Active persona tracking to ensure smooth switching with preset buttons
+  const [activePersona, setActivePersona] = useState(preselectedPersona);
+
   // If user is already authenticated (valid session), redirect to role-specific dashboard
   useEffect(() => {
     if (!loading && isAuthenticated && user) {
@@ -48,12 +51,12 @@ export default function Login({ onNavigate }) {
       const loggedInUser = await login(email, password, rememberMe);
 
       // If came from persona switcher, verify role matches
-      if (preselectedPersona && loggedInUser.role !== preselectedPersona) {
+      if (activePersona && loggedInUser.role !== activePersona) {
         // Role mismatch — logout and show error
         const { logout } = await import('../context/AuthContext');
         setError(
-          `This account has role "${loggedInUser.role}", but "${preselectedPersona}" is required. ` +
-          `Please sign in with a ${preselectedPersona} account.`
+          `This account has role "${loggedInUser.role}", but "${activePersona}" is required. ` +
+          `Please sign in with a ${activePersona} account.`
         );
         setIsLoading(false);
         return;
@@ -75,9 +78,13 @@ export default function Login({ onNavigate }) {
     }
   }
 
-  function handleQuickLogin(userEmail, userPass) {
+  function handleQuickLogin(userEmail, userPass, role) {
     setEmail(userEmail);
     setPassword(userPass);
+    if (role) {
+      setActivePersona(role);
+    }
+    setError('');
   }
 
   return (
@@ -90,8 +97,8 @@ export default function Login({ onNavigate }) {
               <Shield size={28} />
             </div>
             <h2>
-              {preselectedPersona
-                ? `Sign In as ${preselectedPersona}`
+              {activePersona
+                ? `Sign In as ${activePersona}`
                 : 'Sign In to SecureWork'}
             </h2>
             <p className="text-secondary text-sm">
@@ -201,20 +208,37 @@ export default function Login({ onNavigate }) {
             <div className="demo-title">Preset Test Credentials</div>
             <div className="demo-btn-grid">
               <button
+                type="button"
                 className="demo-btn"
-                onClick={() => handleQuickLogin('admin@securework.local', 'AdminSecurePass123!')}
+                onClick={() => handleQuickLogin('admin@securework.local', 'AdminSecurePass123!', 'ADMIN')}
               >
                 <strong>Admin</strong>: admin@securework.local
               </button>
               <button
+                type="button"
                 className="demo-btn"
-                onClick={() => handleQuickLogin('auditor@securework.local', 'AdminSecurePass123!')}
+                onClick={() => handleQuickLogin('issuer_auth@stanford.edu', 'SecureUserPass123!', 'ISSUER')}
+              >
+                <strong>Issuer</strong>: issuer_auth@stanford.edu
+              </button>
+              <button
+                type="button"
+                className="demo-btn"
+                onClick={() => handleQuickLogin('hr_lead@enterprise.local', 'SecureUserPass123!', 'HR')}
+              >
+                <strong>HR</strong>: hr_lead@enterprise.local
+              </button>
+              <button
+                type="button"
+                className="demo-btn"
+                onClick={() => handleQuickLogin('auditor@securework.local', 'AdminSecurePass123!', 'AUDITOR')}
               >
                 <strong>Auditor</strong>: auditor@securework.local
               </button>
               <button
+                type="button"
                 className="demo-btn"
-                onClick={() => handleQuickLogin('scholar@stanford.edu', 'SecureUserPass123!')}
+                onClick={() => handleQuickLogin('scholar@stanford.edu', 'SecureUserPass123!', 'USER')}
               >
                 <strong>User</strong>: scholar@stanford.edu
               </button>

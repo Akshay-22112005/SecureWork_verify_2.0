@@ -45,12 +45,31 @@ async function startServer() {
       healthEndpoint: `http://localhost:${env.PORT}/api/health`
     });
 
-    console.log(`==================================================`);
-    console.log(`  SecureWork Verify Backend Service Started`);
-    console.log(`  Environment: ${env.NODE_ENV}`);
-    console.log(`  Port:        ${env.PORT}`);
-    console.log(`  Health:      http://localhost:${env.PORT}/api/health`);
-    console.log(`==================================================`);
+        console.log(`==================================================`);
+        console.log(`  SecureWork Verify Backend Service Started`);
+        console.log(`  Environment: ${env.NODE_ENV}`);
+        console.log(`  Port:        ${port}`);
+        console.log(`  Health:      http://localhost:${port}/api/health`);
+        console.log(`==================================================`);
+
+        currentPort = port;
+        resolve(srv);
+      });
+
+      srv.on('error', (err) => {
+        if (err.code === 'EADDRINUSE' && retries < MAX_PORT_RETRIES) {
+          retries++;
+          const nextPort = port + 1;
+          logger.info(`Port ${port} is in use, trying port ${nextPort}... (attempt ${retries}/${MAX_PORT_RETRIES})`);
+          srv.close();
+          tryListen(nextPort);
+        } else {
+          reject(err);
+        }
+      });
+    }
+
+    tryListen(currentPort);
   });
 
   // Security timeouts: mitigate Slowloris and connection starvation attacks

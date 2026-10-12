@@ -1,11 +1,37 @@
 import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { ShieldAlert, LayoutDashboard, ShieldCheck, LogIn, UserPlus, Lock } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import StatusBadge from './StatusBadge';
 
-export default function AccessDenied({ targetPage, requiredRoles = [], onNavigate }) {
+export default function AccessDenied({ targetPage, requiredRoles = [], onNavigate, currentRole, requiredRole }) {
   const { user, role, isAuthenticated } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const isUnauthenticated = !isAuthenticated || role === 'GUEST';
+  const effectiveTarget = targetPage || location?.pathname || 'Unknown';
+  const effectiveRole = currentRole || role || 'GUEST';
+
+  const rolesList = Array.isArray(requiredRoles) && requiredRoles.length > 0
+    ? requiredRoles
+    : (requiredRole ? (Array.isArray(requiredRole) ? requiredRole : [requiredRole]) : []);
+
+  const pathMap = {
+    login: '/login',
+    register: '/register',
+    dashboard: '/dashboard',
+    verify_document: '/verify'
+  };
+
+  function handleNav(dest) {
+    if (onNavigate) {
+      onNavigate(dest);
+    } else {
+      const target = pathMap[dest] || (dest.startsWith('/') ? dest : `/${dest}`);
+      navigate(target);
+    }
+  }
 
   return (
     <div className="page-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '65vh' }}>
@@ -49,7 +75,7 @@ export default function AccessDenied({ targetPage, requiredRoles = [], onNavigat
           ) : (
             <>
               Based on <strong>Role-Based Access Control (RBAC)</strong> policies, your active role 
-              (<strong className="text-cyan">{role}</strong>) does not have sufficient permissions to access this section.
+              (<strong className="text-cyan">{effectiveRole}</strong>) does not have sufficient permissions to access this section.
             </>
           )}
         </p>
@@ -66,19 +92,19 @@ export default function AccessDenied({ targetPage, requiredRoles = [], onNavigat
         >
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Target Section:</span>
-            <span className="code-snippet text-xs">{targetPage}</span>
+            <span className="code-snippet text-xs">Requested: {effectiveTarget} · Role: {effectiveRole}</span>
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
             <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Your Current Status:</span>
-            <StatusBadge status={role || 'GUEST'} label={role || 'GUEST'} />
+            <StatusBadge status={effectiveRole} label={effectiveRole} />
           </div>
 
-          {requiredRoles && requiredRoles.length > 0 && (
+          {rolesList && rolesList.length > 0 && (
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Required Role(s):</span>
-              <div style={{ display: 'flex', gap: '4px' }}>
-                {requiredRoles.map((r) => (
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                {rolesList.map((r) => (
                   <span key={r} className="level-badge" style={{ fontSize: '0.7rem' }}>{r}</span>
                 ))}
               </div>
@@ -91,7 +117,7 @@ export default function AccessDenied({ targetPage, requiredRoles = [], onNavigat
             <>
               <button 
                 className="action-btn primary text-xs" 
-                onClick={() => onNavigate('login')}
+                onClick={() => handleNav('login')}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
               >
                 <LogIn size={14} />
@@ -100,7 +126,7 @@ export default function AccessDenied({ targetPage, requiredRoles = [], onNavigat
 
               <button 
                 className="action-btn secondary text-xs" 
-                onClick={() => onNavigate('verify_document')}
+                onClick={() => handleNav('verify_document')}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
               >
                 <ShieldCheck size={14} />
@@ -109,7 +135,7 @@ export default function AccessDenied({ targetPage, requiredRoles = [], onNavigat
 
               <button 
                 className="action-btn text-xs" 
-                onClick={() => onNavigate('register')}
+                onClick={() => handleNav('register')}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', border: '1px solid var(--border-subtle)' }}
               >
                 <UserPlus size={14} />
@@ -120,7 +146,7 @@ export default function AccessDenied({ targetPage, requiredRoles = [], onNavigat
             <>
               <button 
                 className="action-btn primary text-xs" 
-                onClick={() => onNavigate('dashboard')}
+                onClick={() => handleNav('dashboard')}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
               >
                 <LayoutDashboard size={14} />
@@ -129,7 +155,7 @@ export default function AccessDenied({ targetPage, requiredRoles = [], onNavigat
 
               <button 
                 className="action-btn secondary text-xs" 
-                onClick={() => onNavigate('verify_document')}
+                onClick={() => handleNav('verify_document')}
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
               >
                 <ShieldCheck size={14} />

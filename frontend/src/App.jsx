@@ -45,6 +45,8 @@ function PageWrapper({ Component, ...rest }) {
     if (typeof pageIdOrPath === 'string') {
       if (pageIdOrPath.startsWith('/')) {
         navigate(pageIdOrPath, { state: params });
+      } else if (pageIdOrPath === 'verify_document' && params?.credentialId) {
+        navigate(`/verify/${params.credentialId}`, { state: params });
       } else {
         const pathMap = {
           dashboard: '/dashboard',

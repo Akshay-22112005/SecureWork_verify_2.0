@@ -16,14 +16,21 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
   const isHrMode = isHr || role === 'HR';
   const routeParams = useParams();
   const location = useLocation();
-  const initialCred = routeParams?.credentialId || location?.state?.credentialId || initialParams?.credentialId || '';
-  const initialDocHash = location?.state?.documentHash || initialParams?.documentHash || '';
-  const initialDocId = location?.state?.documentId || initialParams?.documentId || '';
 
-  const [activeTab, setActiveTab] = useState(isHrMode ? 'hr_candidate' : 'direct');
-  const [credentialId, setCredentialId] = useState(initialCred);
-  const [documentHash, setDocumentHash] = useState(initialDocHash);
-  const [documentId, setDocumentId] = useState(initialDocId);
+  // Parse query parameters (?credentialId=... or ?id=...)
+  const queryParams = new URLSearchParams(location.search);
+  const queryCredId = queryParams.get('credentialId') || queryParams.get('id') || '';
+  const queryDocHash = queryParams.get('documentHash') || queryParams.get('hash') || '';
+  const queryDocId = queryParams.get('documentId') || '';
+
+  const effectiveCredId = routeParams?.credentialId || queryCredId || location?.state?.credentialId || initialParams?.credentialId || '';
+  const effectiveDocHash = queryDocHash || location?.state?.documentHash || initialParams?.documentHash || '';
+  const effectiveDocId = queryDocId || location?.state?.documentId || initialParams?.documentId || '';
+
+  const [activeTab, setActiveTab] = useState(effectiveCredId ? 'direct' : (isHrMode ? 'hr_candidate' : 'direct'));
+  const [credentialId, setCredentialId] = useState(effectiveCredId);
+  const [documentHash, setDocumentHash] = useState(effectiveDocHash);
+  const [documentId, setDocumentId] = useState(effectiveDocId);
   const [candidateCredentials, setCandidateCredentials] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -155,14 +162,17 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
   }
 
   useEffect(() => {
-    if (initialParams.credentialId) setCredentialId(initialParams.credentialId);
-    if (initialParams.documentHash) setDocumentHash(initialParams.documentHash);
-    if (initialParams.documentId) setDocumentId(initialParams.documentId);
-
-    if (initialParams.credentialId || initialParams.documentHash) {
-      executeEvaluation(initialParams.credentialId, initialParams.documentHash, initialParams.documentId);
+    if (effectiveCredId) {
+      setCredentialId(effectiveCredId);
+      setActiveTab('direct');
     }
-  }, [initialParams.credentialId, initialParams.documentHash, initialParams.documentId]);
+    if (effectiveDocHash) setDocumentHash(effectiveDocHash);
+    if (effectiveDocId) setDocumentId(effectiveDocId);
+
+    if (effectiveCredId || effectiveDocHash) {
+      executeEvaluation(effectiveCredId, effectiveDocHash, effectiveDocId);
+    }
+  }, [effectiveCredId, effectiveDocHash, effectiveDocId]);
 
   async function handleVerify(e) {
     if (e) e.preventDefault();

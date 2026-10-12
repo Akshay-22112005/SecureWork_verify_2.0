@@ -354,7 +354,7 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
                 </div>
                 <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
                   <button className="action-btn primary text-xs" onClick={() => onNavigate("credential_list", { credentialId: issuedResult.credential.credentialId })}><Award size={14} /> View in Registry</button>
-                  <button className="action-btn secondary text-xs" onClick={() => onNavigate("verify_document", { credentialId: issuedResult.credential.credentialId })}><ShieldCheck size={14} /> Verify Credential</button>
+                  <button className="action-btn secondary text-xs" onClick={() => onNavigate(`/verify/${issuedResult.credential.credentialId}`, { credentialId: issuedResult.credential.credentialId })}><ShieldCheck size={14} /> Verify Credential</button>
                   <button className="action-btn secondary text-xs" onClick={() => { setIssuedResult(null); setTitle(""); }}>Issue Another</button>
                 </div>
               </div>
