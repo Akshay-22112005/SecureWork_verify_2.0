@@ -50,12 +50,29 @@ export default function KeyStatus({ onNavigate }) {
   }
 
   async function handleCompromiseSubmit(e) {
-    e.preventDefault(); if (!compromiseTarget) return;
+    e.preventDefault();
+    if (!compromiseTarget) return;
+    const reason = compromiseReason.trim();
+    if (!reason) {
+      setActionError("Enter the compromise incident details before confirming.");
+      return;
+    }
+    setActionMessage("");
+    setActionError("");
     setSubmittingCompromise(true);
     try {
-      const res = await api.issuerKeys.compromise(compromiseTarget.keyId, compromiseReason || "Security alert");
-      if (res?.success) { setActionMessage(`Key ${compromiseTarget.keyId} marked as COMPROMISED.`); setCompromiseTarget(null); setCompromiseReason(""); loadKeys(); }
-    } catch (err) { alert(err.message || "Failed to report compromised key"); }
+      const res = await api.issuerKeys.compromise(compromiseTarget.keyId, reason);
+      if (!res?.success) {
+        throw new Error(res?.error?.message || "The server did not confirm the key compromise.");
+      }
+      const compromisedKeyId = compromiseTarget.keyId;
+      setCompromiseTarget(null);
+      setCompromiseReason("");
+      await loadKeys();
+      setActionMessage(`Key ${compromisedKeyId} marked as COMPROMISED.`);
+    } catch (err) {
+      setActionError(err.message || "Failed to report compromised key");
+    }
     finally { setSubmittingCompromise(false); }
   }
 
@@ -326,6 +343,7 @@ export default function KeyStatus({ onNavigate }) {
             </div>
             <div className="modal-body">
               <p className="text-secondary text-sm">Flagging key <strong className="text-primary">{compromiseTarget.keyId}</strong> as <strong>COMPROMISED</strong> immediately revokes its signing authority and dispatches a critical security notification.</p>
+              {actionError && <div className="alert-banner danger" role="alert" style={{ marginTop: "1rem" }}><AlertTriangle size={16} /><span>{actionError}</span></div>}
               <form onSubmit={handleCompromiseSubmit} style={{ marginTop: "1rem" }}>
                 <div className="form-group">
                   <label>Compromise Incident Detail</label>

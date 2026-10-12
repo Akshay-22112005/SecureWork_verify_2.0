@@ -21,7 +21,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 
 export default function SimplePricingPreview({ onNavigate }) {
-  const { role, isIssuer, isAdmin } = useAuth();
+  const { role } = useAuth();
   const [showContactModal, setShowContactModal] = useState(false);
   const [formSubmitted, setFormSubmitted] = useState(false);
   const [formData, setFormData] = useState({
@@ -60,6 +60,22 @@ export default function SimplePricingPreview({ onNavigate }) {
       volume: '5,000 - 25,000 certificates/month',
       message: ''
     });
+  }
+
+  function handleGetStarted() {
+    const roleDestination = {
+      ADMIN: 'issue_credential',
+      ISSUER: 'issue_credential',
+      USER: 'upload_document',
+      HR: 'verify_document',
+      AUDITOR: 'audit_logs'
+    }[role];
+
+    if (roleDestination && onNavigate) {
+      onNavigate(roleDestination);
+    } else {
+      setShowContactModal(true);
+    }
   }
 
   return (
@@ -183,7 +199,7 @@ export default function SimplePricingPreview({ onNavigate }) {
 
             <button
               className="action-btn secondary full-width"
-              onClick={() => onNavigate && onNavigate('upload_document')}
+              onClick={handleGetStarted}
             >
               Get Started
             </button>
@@ -236,13 +252,7 @@ export default function SimplePricingPreview({ onNavigate }) {
 
             <button
               className="action-btn highlighted-cta-btn full-width"
-              onClick={() => {
-                if (isIssuer || isAdmin) {
-                  onNavigate && onNavigate('issue_credential');
-                } else {
-                  setShowContactModal(true);
-                }
-              }}
+              onClick={handleGetStarted}
             >
               Get Started
             </button>
@@ -307,13 +317,13 @@ export default function SimplePricingPreview({ onNavigate }) {
           <div className="cta-banner-actions">
             <button
               className="action-btn cta-teal-btn"
-              onClick={() => onNavigate && onNavigate('issue_credential')}
+              onClick={handleGetStarted}
             >
               Get Started
             </button>
             <button
               className="action-btn cta-outlined-btn"
-              onClick={() => onNavigate && onNavigate('verify_document')}
+              onClick={() => onNavigate && onNavigate(role === 'AUDITOR' ? 'audit_logs' : 'verify_document')}
             >
               View Verification Demo
             </button>
