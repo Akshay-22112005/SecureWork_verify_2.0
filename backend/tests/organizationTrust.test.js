@@ -265,6 +265,42 @@ describe('Phase 3 Organization Trust & Issuer Authorization Tests', () => {
     assert.strictEqual(body.error.code, 'DUPLICATE_ISSUER_PROFILE');
   });
 
+  test('ADMIN can register a selected user as issuer, but non-admins cannot target another user', async () => {
+    const forbiddenRes = await fetch(`${baseUrl}/api/issuers/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${regularToken}`
+      },
+      body: JSON.stringify({
+        organizationId: verifiedOrgId,
+        userId: secondUser.userId,
+        issuerCode: 'ISS_TEST_FORBIDDEN_BIND'
+      })
+    });
+    assert.strictEqual(forbiddenRes.status, 403);
+
+    const adminRes = await fetch(`${baseUrl}/api/issuers/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${adminToken}`
+      },
+      body: JSON.stringify({
+        organizationId: verifiedOrgId,
+        userId: secondUser.userId,
+        issuerCode: 'ISS_TEST_ADMIN_BIND'
+      })
+    });
+
+    assert.strictEqual(adminRes.status, 201);
+    const body = await adminRes.json();
+    assert.strictEqual(body.success, true);
+    assert.strictEqual(body.data.issuer.userId, secondUser.userId);
+    assert.strictEqual(body.data.issuer.organizationId, verifiedOrgId);
+    assert.strictEqual(body.data.issuer.status, 'PENDING');
+  });
+
   test('unauthorized role access: non-admin cannot approve an issuer', async () => {
     const res = await fetch(`${baseUrl}/api/issuers/${createdIssuerId}/approve`, {
       method: 'PATCH',
@@ -355,13 +391,11 @@ describe('Phase 3 Organization Trust & Issuer Authorization Tests', () => {
   });
 
   test('organization suspension: ADMIN suspends organization and cascades to member issuers', async () => {
-    // Register second candidate under verifiedOrg
-    const secondIssuer = await Issuer.create({
-      issuerCode: 'ISS_TEST_SECOND',
-      userId: secondUser.userId,
-      organizationId: verifiedOrgId,
-      status: 'ACTIVE'
-    });
+    // Use the admin-bound candidate and mark the pending issuer active for the cascade check.
+    const secondIssuer = await Issuer.findOne({ userId: secondUser.userId });
+    assert.ok(secondIssuer);
+    secondIssuer.status = 'ACTIVE';
+    await secondIssuer.save();
 
     const res = await fetch(`${baseUrl}/api/organizations/${verifiedOrgId}/suspend`, {
       method: 'PATCH',

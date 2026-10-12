@@ -24,7 +24,7 @@ class IssuerService {
    * @param {object} user - Authenticated user
    * @returns {Promise<object>}
    */
-  async registerIssuer({ organizationId, issuerCode, authorizationEvidence }, user) {
+  async registerIssuer({ organizationId, userId, issuerCode, authorizationEvidence }, user) {
     if (!user || !user.userId) {
       throw new ForbiddenError('Authenticated user required', 'UNAUTHORIZED');
     }
@@ -33,8 +33,18 @@ class IssuerService {
       throw new ValidationError('Organization ID or code is required');
     }
 
+    // Admins may register another verified account; normal users can only register themselves.
+    let targetUser = user;
+    if (userId && userId !== user.userId) {
+      if (user.role !== 'ADMIN') {
+        throw new ForbiddenError('Only administrators can register another user as an issuer', 'FORBIDDEN');
+      }
+      targetUser = await User.findOne({ userId });
+      if (!targetUser) throw new NotFoundError('Target user not found', 'USER_NOT_FOUND');
+    }
+
     // Constraint: One user may have at most ONE issuer profile
-    const existingIssuer = await Issuer.findOne({ userId: user.userId });
+    const existingIssuer = await Issuer.findOne({ userId: targetUser.userId });
     if (existingIssuer) {
       throw new ConflictError(
         'User already has an issuer profile registered. Only one issuer profile per user is permitted.',
@@ -79,7 +89,7 @@ class IssuerService {
     // Enforce initial PENDING status (Users can never make themselves ACTIVE)
     const issuer = await Issuer.create({
       issuerCode: code,
-      userId: user.userId,
+      userId: targetUser.userId,
       organizationId: org.organizationId,
       authorizationEvidence: authorizationEvidence || {},
       status: 'PENDING'
@@ -93,6 +103,7 @@ class IssuerService {
       {
         issuerCode: code,
         organizationId: org.organizationId,
+        targetUserId: targetUser.userId,
         status: 'PENDING'
       }
     );
@@ -407,6 +418,7 @@ class IssuerService {
         userId: recipient.userId,
         name: recipient.name,
         email: recipient.email,
+        role: recipient.role,
         status: recipient.status
       },
       documents: documents.map((d) => d.toJSON())

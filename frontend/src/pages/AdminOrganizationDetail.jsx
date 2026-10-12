@@ -31,6 +31,12 @@ export default function AdminOrganizationDetail({ onNavigate }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [issuerEmail, setIssuerEmail] = useState('');
+  const [verifiedUser, setVerifiedUser] = useState(null);
+  const [verifyingUser, setVerifyingUser] = useState(false);
+  const [registeringIssuer, setRegisteringIssuer] = useState(false);
+  const [modalError, setModalError] = useState('');
 
   // Associated resources
   const [issuers, setIssuers] = useState([]);
@@ -176,6 +182,63 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
     } catch (err) {
       setError(err.message || 'Failed to suspend issuer');
     }
+  }
+
+  async function handleVerifyUser() {
+    setModalError('');
+    setVerifiedUser(null);
+    const email = issuerEmail.trim();
+    if (!email) {
+      setModalError('Enter an email address to verify.');
+      return;
+    }
+    setVerifyingUser(true);
+    try {
+      const res = await api.issuers.lookupRecipient(email);
+      const result = res?.data || res;
+      if (!result?.found || !result?.recipient) {
+        setModalError('User not found. Ensure the user has registered an account first.');
+        return;
+      }
+      setVerifiedUser(result.recipient);
+    } catch (err) {
+      setModalError(err.message || 'Unable to verify this user.');
+    } finally {
+      setVerifyingUser(false);
+    }
+  }
+
+  async function handleConfirmRegisterIssuer() {
+    if (!organization || !verifiedUser) return;
+    setModalError('');
+    setRegisteringIssuer(true);
+    try {
+      const code = `ISS_${(organization.organizationCode || organization.organizationId).replace(/[^A-Z0-9]/gi, '_').toUpperCase()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+      const res = await api.issuers.register({
+        organizationId: organization.organizationId,
+        userId: verifiedUser.userId,
+        issuerCode: code
+      });
+      const issuer = res?.data?.issuer || res?.issuer;
+      if (!issuer?.issuerId) throw new Error('Issuer registration did not return an issuer ID.');
+      await api.issuers.approve(issuer.issuerId);
+      setShowRegisterModal(false);
+      setIssuerEmail('');
+      setVerifiedUser(null);
+      setMessage(`Issuer registered successfully for ${organization.name}`);
+      await loadRelatedResources(organization);
+    } catch (err) {
+      setModalError(err.message || 'Failed to register issuer.');
+    } finally {
+      setRegisteringIssuer(false);
+    }
+  }
+
+  function openRegisterModal() {
+    setIssuerEmail('');
+    setVerifiedUser(null);
+    setModalError('');
+    setShowRegisterModal(true);
   }
 
   const tabs = [
@@ -414,6 +477,9 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
               <h3 style={{ margin: 0 }}>Accredited Issuers for {organization.name}</h3>
               <p className="text-muted" style={{ margin: 0, fontSize: '0.8rem' }}>Credential-issuing authorities operating under this institutional trust anchor.</p>
             </div>
+            <button className="action-btn primary text-xs" onClick={openRegisterModal}>
+              + Register Issuer
+            </button>
             <button className="action-btn secondary text-xs" onClick={() => navigate('/admin/issuers')}>
               Go to Issuers Management →
             </button>
@@ -427,7 +493,7 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
               <button 
                 className="action-btn primary text-xs" 
                 style={{ marginTop: '0.75rem' }}
-                onClick={() => navigate('/admin/issuers')}
+                onClick={openRegisterModal}
               >
                 Register an Issuer for {organization.name}
               </button>
@@ -576,6 +642,35 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
               </tbody>
             </table>
           )}
+        </div>
+      )}
+
+      {showRegisterModal && (
+        <div role="presentation" onClick={(event) => { if (event.target === event.currentTarget && !registeringIssuer) setShowRegisterModal(false); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.68)', display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="register-issuer-title" className="glass-card" style={{ width: 'min(100%, 520px)', padding: '1.5rem', boxShadow: '0 20px 70px rgba(0,0,0,0.45)' }}>
+            <h2 id="register-issuer-title" style={{ marginTop: 0 }}>Register Issuer for {organization.name}</h2>
+            <div style={{ display: 'grid', gap: '0.3rem', marginBottom: '1rem' }}>
+              <label className="text-muted" htmlFor="issuer-organization-id">Organization</label>
+              <input id="issuer-organization-id" value={`${organization.name} (${organization.organizationId})`} readOnly className="form-input" />
+            </div>
+            <label className="text-muted" htmlFor="issuer-email">User email</label>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.35rem' }}>
+              <input id="issuer-email" type="email" value={issuerEmail} onChange={(event) => { setIssuerEmail(event.target.value); setVerifiedUser(null); setModalError(''); }} placeholder="name@example.com" className="form-input" style={{ flex: 1, minWidth: 0 }} disabled={registeringIssuer} />
+              <button type="button" className="action-btn secondary text-xs" onClick={handleVerifyUser} disabled={verifyingUser || registeringIssuer || !issuerEmail.trim()}>{verifyingUser ? 'Verifying…' : 'Verify Email'}</button>
+            </div>
+            {verifiedUser && (
+              <div className="glass-card" style={{ padding: '0.85rem', marginTop: '1rem', borderColor: 'rgba(16,185,129,0.5)' }}>
+                <strong style={{ display: 'block' }}>{verifiedUser.name}</strong>
+                <span>{verifiedUser.email}</span>
+                <div className="text-muted" style={{ marginTop: '0.25rem' }}>Current role: {verifiedUser.role || 'USER'}</div>
+              </div>
+            )}
+            {modalError && <div role="alert" className="alert-banner danger" style={{ marginTop: '1rem' }}><AlertTriangle size={16} /><span>{modalError}</span></div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem' }}>
+              <button type="button" className="action-btn secondary text-xs" onClick={() => setShowRegisterModal(false)} disabled={registeringIssuer}>Cancel</button>
+              <button type="button" className="action-btn primary text-xs" onClick={handleConfirmRegisterIssuer} disabled={!verifiedUser || registeringIssuer}>{registeringIssuer ? 'Registering…' : 'Confirm & Bind Issuer'}</button>
+            </div>
+          </section>
         </div>
       )}
     </div>
