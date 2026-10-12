@@ -12,7 +12,6 @@ import {
   Users, 
   Settings, 
   FileSpreadsheet, 
-  Link2, 
   FileBadge, 
   CheckSquare, 
   ExternalLink, 
@@ -47,7 +46,6 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
     chain_validation: '/audit/chain',
     admin_users: '/admin/users',
     admin_organizations: '/admin/organizations',
-    admin_trusted_sources: '/admin/trusted-sources',
     admin_issuers: '/admin/issuers',
     admin_settings: '/admin/settings'
   };
@@ -114,7 +112,6 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
       items: [
         { id: 'admin_users', path: '/admin/users', label: 'User Directory & RBAC', icon: Users },
         { id: 'admin_organizations', path: '/admin/organizations', label: 'Organizations & Trust', icon: Building },
-        { id: 'admin_trusted_sources', path: '/admin/trusted-sources', label: 'Trusted Sources (SSRF Safe)', icon: Link2 },
         { id: 'admin_issuers', path: '/admin/issuers', label: 'Issuer Accreditation', icon: FileBadge },
         { id: 'admin_settings', path: '/admin/settings', label: 'System Health & Settings', icon: Settings }
       ]

@@ -13,5 +13,7 @@ router.post('/organizations/:id/users/invite', organizationController.inviteUser
 router.delete('/organizations/:id/users/:userId', organizationController.removeUserFromOrganization);
 router.post('/organizations/:id/users/bulk-csv', upload.single('file'), organizationController.bulkUploadOrganizationUsers);
 router.post('/organizations/:id/users/:userId/resend-invite', organizationController.resendUserInvitation);
+router.post('/organizations/:id/sources', organizationController.createOrganizationTrustedSource);
+router.patch('/organizations/:id/sources/:sourceId/verify', organizationController.verifyOrganizationTrustedSource);
 
 module.exports = router;

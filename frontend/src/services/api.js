@@ -94,7 +94,9 @@ export const api = {
     inviteUserToOrganization: (id, data) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/invite`, { method: 'POST', body: data }),
     removeUserFromOrganization: (id, userId) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
     bulkUploadOrganizationUsers: (id, rows) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/bulk-csv`, { method: 'POST', body: { rows } }),
-    resendUserInvitation: (id, userId) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/${encodeURIComponent(userId)}/resend-invite`, { method: 'POST' })
+    resendUserInvitation: (id, userId) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/${encodeURIComponent(userId)}/resend-invite`, { method: 'POST' }),
+    registerOrganizationSource: (id, data) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/sources`, { method: 'POST', body: data }),
+    verifyOrganizationSource: (id, sourceId) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/sources/${encodeURIComponent(sourceId)}/verify`, { method: 'PATCH' })
   },
 
   // Issuers

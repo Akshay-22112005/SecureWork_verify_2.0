@@ -29,7 +29,6 @@ import VerifyOfficialSource from './pages/VerifyOfficialSource';
 import AdminUsers from './pages/AdminUsers';
 import AdminOrganizations from './pages/AdminOrganizations';
 import AdminOrganizationDetail from './pages/AdminOrganizationDetail';
-import AdminTrustedSources from './pages/AdminTrustedSources';
 import AdminIssuers from './pages/AdminIssuers';
 import AdminSystemSettings from './pages/AdminSystemSettings';
 import AuditLogs from './pages/AuditLogs';
@@ -64,7 +63,6 @@ function PageWrapper({ Component, ...rest }) {
           verify_source: '/trusted-sources/verify',
           admin_users: '/admin/users',
           admin_organizations: '/admin/organizations',
-          admin_trusted_sources: '/admin/trusted-sources',
           admin_issuers: '/admin/issuers',
           admin_settings: '/admin/settings',
           audit_logs: '/audit/logs',
@@ -272,11 +270,7 @@ export function AppRoutes() {
         />
         <Route
           path="/admin/trusted-sources"
-          element={
-            <RoleRoute allowedRoles={['ADMIN']}>
-              <PageWrapper Component={AdminTrustedSources} />
-            </RoleRoute>
-          }
+          element={<Navigate to="/admin/organizations" replace />}
         />
         <Route
           path="/admin/issuers"

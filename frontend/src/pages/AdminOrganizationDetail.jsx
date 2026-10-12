@@ -95,6 +95,13 @@ export default function AdminOrganizationDetail({ onNavigate }) {
   const [assignUserError, setAssignUserError] = useState('');
   const [inviteEmailNotFound, setInviteEmailNotFound] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [showTrustedSourceModal, setShowTrustedSourceModal] = useState(false);
+  const [trustedSourceName, setTrustedSourceName] = useState('');
+  const [trustedSourceType, setTrustedSourceType] = useState('DID_DOCUMENT');
+  const [trustedSourceUrl, setTrustedSourceUrl] = useState('');
+  const [registeringTrustedSource, setRegisteringTrustedSource] = useState(false);
+  const [trustedSourceError, setTrustedSourceError] = useState('');
+  const [verifyingTrustedSource, setVerifyingTrustedSource] = useState('');
   const [bulkCsvText, setBulkCsvText] = useState('');
   const [bulkRows, setBulkRows] = useState([]);
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -327,6 +334,45 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
       setBulkError(err.message || 'Bulk user upload failed.');
     } finally {
       setBulkLoading(false);
+    }
+  }
+
+  async function handleRegisterTrustedSource(event) {
+    event.preventDefault();
+    setTrustedSourceError('');
+    setRegisteringTrustedSource(true);
+    try {
+      await api.admin.registerOrganizationSource(organization.organizationId, {
+        organizationId: organization.organizationId,
+        name: trustedSourceName.trim(),
+        sourceType: trustedSourceType,
+        baseUrl: trustedSourceUrl.trim()
+      });
+      setMessage(`Trusted source registered for ${organization.name}. It is pending verification.`);
+      setTrustedSourceName('');
+      setTrustedSourceType('DID_DOCUMENT');
+      setTrustedSourceUrl('');
+      setShowTrustedSourceModal(false);
+      await loadRelatedResources(organization);
+    } catch (err) {
+      setTrustedSourceError(err.message || 'Failed to register trusted source.');
+    } finally {
+      setRegisteringTrustedSource(false);
+    }
+  }
+
+  async function handleVerifyTrustedSource(source) {
+    const sourceId = source._id || source.sourceCode;
+    setVerifyingTrustedSource(sourceId);
+    setError('');
+    try {
+      await api.admin.verifyOrganizationSource(organization.organizationId, sourceId);
+      setMessage(`Trusted source "${source.name}" is now active.`);
+      await loadRelatedResources(organization);
+    } catch (err) {
+      setError(err.message || 'Failed to verify trusted source.');
+    } finally {
+      setVerifyingTrustedSource('');
     }
   }
 
@@ -876,8 +922,8 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
               <h3 style={{ margin: 0 }}>Trusted Sources for {organization.name}</h3>
               <p className="text-muted" style={{ margin: 0, fontSize: '0.8rem' }}>Official verification endpoints and external registries bound to this organization.</p>
             </div>
-            <button className="action-btn secondary text-xs" onClick={() => navigate('/admin/trusted-sources')}>
-              Go to Trusted Sources →
+            <button className="action-btn primary text-xs" onClick={() => { setTrustedSourceError(''); setShowTrustedSourceModal(true); }}>
+              + Register Trusted Source
             </button>
           </div>
           {loadingResources ? (
@@ -889,7 +935,7 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
               <button 
                 className="action-btn primary text-xs" 
                 style={{ marginTop: '0.75rem' }}
-                onClick={() => navigate('/admin/trusted-sources')}
+                onClick={() => { setTrustedSourceError(''); setShowTrustedSourceModal(true); }}
               >
                 Register Trusted Source
               </button>
@@ -903,6 +949,7 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
                   <th>Type</th>
                   <th>Base URL</th>
                   <th>Status</th>
+                  <th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -913,6 +960,20 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
                     <td><span className="badge-tag">{source.sourceType}</span></td>
                     <td style={{ fontSize: '0.8rem' }}>{source.baseUrl}</td>
                     <td><StatusBadge status={source.status || 'ACTIVE'} /></td>
+                    <td>
+                      {source.status === 'PENDING' ? (
+                        <button
+                          type="button"
+                          className="action-btn primary text-xs"
+                          onClick={() => handleVerifyTrustedSource(source)}
+                          disabled={verifyingTrustedSource === (source._id || source.sourceCode)}
+                        >
+                          {verifyingTrustedSource === (source._id || source.sourceCode) ? 'Verifying…' : 'Verify & Activate'}
+                        </button>
+                      ) : source.status === 'ACTIVE' ? (
+                        <span className="text-xs" style={{ color: '#34d399', fontWeight: 600 }}>Active</span>
+                      ) : <span className="text-muted text-xs">—</span>}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -1083,6 +1144,33 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
               </button>
             </div>
           </section>
+        </div>
+      )}
+
+      {showTrustedSourceModal && (
+        <div role="presentation" onClick={(event) => { if (event.target === event.currentTarget && !registeringTrustedSource) setShowTrustedSourceModal(false); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.68)', display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <form role="dialog" aria-modal="true" aria-labelledby="trusted-source-title" className="glass-card" onSubmit={handleRegisterTrustedSource} style={{ width: 'min(100%, 560px)', padding: '1.5rem', boxShadow: '0 20px 70px rgba(0,0,0,0.45)', border: '1px solid rgba(139, 92, 246, 0.3)' }}>
+            <h2 id="trusted-source-title" style={{ marginTop: 0 }}>Register Trusted Source for {organization.name}</h2>
+            <p className="text-muted" style={{ marginTop: '-0.4rem' }}>The new source will be scoped to this organization and begin pending verification.</p>
+            <label className="text-muted" htmlFor="trusted-source-name">Source Name</label>
+            <input id="trusted-source-name" required className="form-input" value={trustedSourceName} onChange={(event) => setTrustedSourceName(event.target.value)} placeholder="Sambhram Primary DID Gateway" style={{ width: '100%', margin: '0.35rem 0 1rem' }} disabled={registeringTrustedSource} />
+            <label className="text-muted" htmlFor="trusted-source-type">Source Type</label>
+            <select id="trusted-source-type" className="form-select" value={trustedSourceType} onChange={(event) => setTrustedSourceType(event.target.value)} style={{ width: '100%', margin: '0.35rem 0 1rem' }} disabled={registeringTrustedSource}>
+              <option value="DID_DOCUMENT">DID_DOCUMENT</option>
+              <option value="PUBLIC_KEY_ENDPOINT">PUBLIC_KEY_ENDPOINT</option>
+              <option value="OIDC_DISCOVERY">OIDC_DISCOVERY</option>
+            </select>
+            <label className="text-muted" htmlFor="trusted-source-url">Endpoint URL</label>
+            <input id="trusted-source-url" type="url" required className="form-input" value={trustedSourceUrl} onChange={(event) => setTrustedSourceUrl(event.target.value)} placeholder="https://sambhram.edu/.well-known/did.json" style={{ width: '100%', margin: '0.35rem 0 1rem' }} disabled={registeringTrustedSource} />
+            <div className="glass-card" style={{ padding: '0.75rem 0.9rem', borderColor: 'rgba(251,191,36,0.35)', marginBottom: '1rem' }}>
+              <span className="text-muted">Trust status</span> <span className="text-xs" style={{ color: '#fbbf24', fontWeight: 600, marginLeft: '0.4rem' }}>PENDING VERIFICATION</span>
+            </div>
+            {trustedSourceError && <div role="alert" className="alert-banner danger" style={{ marginBottom: '1rem' }}><AlertTriangle size={16} /><span>{trustedSourceError}</span></div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+              <button type="button" className="action-btn secondary text-xs" onClick={() => setShowTrustedSourceModal(false)} disabled={registeringTrustedSource}>Cancel</button>
+              <button type="submit" className="action-btn primary text-xs" disabled={registeringTrustedSource}>{registeringTrustedSource ? 'Registering…' : 'Register Source'}</button>
+            </div>
+          </form>
         </div>
       )}
     </div>

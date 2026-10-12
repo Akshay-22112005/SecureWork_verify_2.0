@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const organizationService = require('../services/organization.service');
 const Organization = require('../models/organization.model');
 const User = require('../models/user.model');
+const TrustedSource = require('../models/trustedSource.model');
 const emailService = require('../services/email.service');
 const auditService = require('../services/audit.service');
 const { successResponse } = require('../utils/response');
@@ -256,6 +257,73 @@ async function resendUserInvitation(req, res, next) {
   }
 }
 
+/** Create a trust source scoped to the organization in the route. */
+async function createOrganizationTrustedSource(req, res, next) {
+  try {
+    const organization = await findOrganization(req.params.id);
+    const name = String(req.body?.name || '').trim();
+    const sourceType = String(req.body?.sourceType || '').trim().toUpperCase();
+    const baseUrl = String(req.body?.baseUrl || req.body?.endpointUrl || '').trim();
+    if (!name) throw new ValidationError('Source name is required');
+    if (!TrustedSource.SOURCE_TYPES.includes(sourceType)) throw new ValidationError('A valid source type is required');
+    let parsedUrl;
+    try { parsedUrl = new URL(baseUrl); } catch { throw new ValidationError('A valid endpoint URL is required'); }
+    if (!['http:', 'https:'].includes(parsedUrl.protocol)) throw new ValidationError('Endpoint URL must use HTTP or HTTPS');
+
+    const source = await TrustedSource.create({
+      sourceCode: `SRC_${crypto.randomBytes(8).toString('hex').toUpperCase()}`,
+      organizationId: organization.organizationId,
+      name,
+      sourceType,
+      baseUrl,
+      domain: parsedUrl.hostname.toLowerCase(),
+      status: 'ACTIVE',
+      verificationStatus: 'VERIFIED'
+    });
+    await auditService.recordEvent(
+      req.user?.userId || req.user?.id,
+      req.user?.role || 'ADMIN',
+      'TRUST_SOURCE_REGISTERED',
+      source.sourceCode,
+      { organizationId: organization.organizationId, sourceCode: source.sourceCode, name, sourceType, baseUrl }
+    );
+    return successResponse(res, { source }, 201);
+  } catch (err) {
+    next(err);
+  }
+}
+
+/** Verify and activate a trusted source owned by the organization in the route. */
+async function verifyOrganizationTrustedSource(req, res, next) {
+  try {
+    const organization = await findOrganization(req.params.id);
+    const sourceLookup = /^[0-9a-fA-F]{24}$/.test(req.params.sourceId)
+      ? { $or: [{ _id: req.params.sourceId }, { sourceCode: req.params.sourceId }] }
+      : { sourceCode: req.params.sourceId };
+    const source = await TrustedSource.findOne({
+      ...sourceLookup,
+      organizationId: organization.organizationId
+    });
+    if (!source) throw new NotFoundError('Trusted source not found for this organization', 'TRUSTED_SOURCE_NOT_FOUND');
+
+    source.status = 'ACTIVE';
+    source.verificationStatus = 'VERIFIED';
+    source.verifiedBy = req.user?.userId || req.user?.id || null;
+    source.verifiedAt = new Date();
+    await source.save();
+    await auditService.recordEvent(
+      req.user?.userId || req.user?.id,
+      req.user?.role || 'ADMIN',
+      'TRUST_SOURCE_VERIFIED',
+      source.sourceCode,
+      { organizationId: organization.organizationId, sourceCode: source.sourceCode }
+    );
+    return successResponse(res, { source }, 200);
+  } catch (err) {
+    next(err);
+  }
+}
+
 /** Invite a single unregistered email and pre-bind it to the organization. */
 async function inviteUserToOrganization(req, res, next) {
   try {
@@ -408,5 +476,7 @@ module.exports = {
   removeUserFromOrganization,
   bulkUploadOrganizationUsers,
   resendUserInvitation,
+  createOrganizationTrustedSource,
+  verifyOrganizationTrustedSource,
   inviteUserToOrganization
 };
