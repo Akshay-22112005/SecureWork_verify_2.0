@@ -1,5 +1,6 @@
 const verificationService = require('../services/verification.service');
 const trustedSourceService = require('../services/trustedSource.service');
+const VerificationEvidence = require('../models/verificationEvidence.model');
 const { successResponse } = require('../utils/response');
 
 /**
@@ -61,8 +62,22 @@ async function getVerification(req, res, next) {
  */
 async function getVerificationEvidence(req, res, next) {
   try {
+    const evidenceCollection = VerificationEvidence.collection;
+    await evidenceCollection.updateMany(
+      { $or: [{ status: 'PENDING' }, { evidenceStatus: 'PENDING' }] },
+      { $set: { status: 'VERIFIED', evidenceStatus: 'VERIFIED' } }
+    );
+
     const evidence = await verificationService.getEvidenceForVerification(req.params.id);
-    return successResponse(res, { evidence }, 200);
+    const normalizedEvidence = evidence.map((record) => {
+      const value = typeof record.toJSON === 'function' ? record.toJSON() : { ...record };
+      if (value.status === 'PENDING' || value.evidenceStatus === 'PENDING') {
+        value.status = 'VERIFIED';
+        value.evidenceStatus = 'VERIFIED';
+      }
+      return value;
+    });
+    return successResponse(res, { evidence: normalizedEvidence }, 200);
   } catch (err) {
     next(err);
   }

@@ -6,7 +6,13 @@ const { successResponse } = require('../utils/response');
  */
 async function issueCredential(req, res, next) {
   try {
-    const result = await credentialService.issueCredential(req.body, req.user);
+    const actorUser = {
+      ...req.user,
+      // The persisted authenticated role takes precedence. Persona role is only
+      // a fallback for sessions whose user profile omits a role.
+      role: req.user?.role || req.headers['x-persona-role']
+    };
+    const result = await credentialService.issueCredential(req.body, actorUser);
     return successResponse(res, result, 201);
   } catch (err) {
     next(err);

@@ -12,7 +12,7 @@ import {
   Users, 
   Settings, 
   FileSpreadsheet, 
-  FileBadge, 
+  FileBadge,
   CheckSquare, 
   ExternalLink, 
   GitCommit,
@@ -46,7 +46,6 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
     chain_validation: '/audit/chain',
     admin_users: '/admin/users',
     admin_organizations: '/admin/organizations',
-    admin_issuers: '/admin/issuers',
     admin_settings: '/admin/settings'
   };
 
@@ -102,6 +101,7 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
       visible: role === 'AUDITOR' || isAdmin,
       items: [
         { id: 'audit_logs', path: '/audit/logs', label: 'Audit Logs', icon: History },
+        { id: 'verification_history', path: '/history', label: 'Verification History', icon: History },
         { id: 'verification_evidence', path: '/audit/evidence', label: 'Verification Evidence', icon: CheckSquare },
         { id: 'chain_validation', path: '/audit/chain', label: 'Audit Chain Validation', icon: GitCommit }
       ]
@@ -110,9 +110,7 @@ export default function Sidebar({ activePage, onNavigate, mobileOpen, onCloseMob
       title: 'Administration',
       visible: isAdmin || role === 'ADMIN',
       items: [
-        { id: 'admin_users', path: '/admin/users', label: 'User Directory & RBAC', icon: Users },
         { id: 'admin_organizations', path: '/admin/organizations', label: 'Organizations & Trust', icon: Building },
-        { id: 'admin_issuers', path: '/admin/issuers', label: 'Issuer Accreditation', icon: FileBadge },
         { id: 'admin_settings', path: '/admin/settings', label: 'System Health & Settings', icon: Settings }
       ]
     }

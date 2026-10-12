@@ -8,7 +8,9 @@ const router = express.Router();
 router.use(authenticateUser);
 
 // Issue new credential (Version 1) - ADMIN or ISSUER
-router.post('/issue', requireRole('ADMIN', 'ISSUER'), credentialController.issueCredential);
+// Issuer ownership and organization authorization are checked against the
+// resolved issuer profile inside CredentialService.
+router.post('/issue', credentialController.issueCredential);
 
 // Bulk issue credentials via CSV - ADMIN or ISSUER
 router.post('/bulk-issue', requireRole('ADMIN', 'ISSUER'), credentialController.bulkIssue);

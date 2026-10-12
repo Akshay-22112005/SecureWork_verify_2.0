@@ -35,6 +35,10 @@ export const api = {
     }
   },
 
+  artifacts: {
+    upload: (formData) => apiClient('/artifacts/upload', { method: 'POST', body: formData })
+  },
+
   // OCR & AI Analysis
   analysis: {
     upload: (formData) => apiClient('/analysis/upload', { method: 'POST', body: formData }),
@@ -88,6 +92,7 @@ export const api = {
 
   // Organization-scoped administration
   admin: {
+    registerOrganizationIssuer: (id, data) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/issuers`, { method: 'POST', body: data }),
     getOrganizationUsers: (id) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users`),
     searchOrganizationUser: (id, email) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/search?email=${encodeURIComponent(email)}`),
     assignUserToOrganization: (id, userId, role) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users`, { method: 'POST', body: { userId, role } }),
@@ -96,7 +101,10 @@ export const api = {
     bulkUploadOrganizationUsers: (id, rows) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/bulk-csv`, { method: 'POST', body: { rows } }),
     resendUserInvitation: (id, userId) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/users/${encodeURIComponent(userId)}/resend-invite`, { method: 'POST' }),
     registerOrganizationSource: (id, data) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/sources`, { method: 'POST', body: data }),
-    verifyOrganizationSource: (id, sourceId) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/sources/${encodeURIComponent(sourceId)}/verify`, { method: 'PATCH' })
+    verifyOrganizationSource: (id, sourceId) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/sources/${encodeURIComponent(sourceId)}/verify`, { method: 'PATCH' }),
+    approveOrganizationIssuer: (id, issuerId) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/issuers/${encodeURIComponent(issuerId)}/approve`, { method: 'PATCH' }),
+    suspendOrganizationIssuer: (id, issuerId, reason) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/issuers/${encodeURIComponent(issuerId)}/suspend`, { method: 'PATCH', body: { reason } }),
+    revokeOrganizationIssuer: (id, issuerId) => apiClient(`/admin/organizations/${encodeURIComponent(id)}/issuers/${encodeURIComponent(issuerId)}`, { method: 'DELETE' })
   },
 
   // Issuers
@@ -128,7 +136,8 @@ export const api = {
       return apiClient(`/issuer-keys${q ? `?${q}` : ''}`);
     },
     getById: (id) => apiClient(`/issuer-keys/${id}`),
-    rotate: (issuerId, data = {}) => apiClient(`/issuers/${issuerId}/rotate-key`, { method: 'POST', body: data }),
+    generate: (data) => apiClient('/keys/generate', { method: 'POST', body: data }),
+    rotate: (issuerId, data = {}) => apiClient('/keys/rotate', { method: 'POST', body: { ...data, issuerId } }),
     compromise: (keyId, reason) => apiClient(`/issuer-keys/${keyId}/compromise`, { method: 'PATCH', body: { reason } }),
     revoke: (keyId, reason) => apiClient(`/issuer-keys/${keyId}/revoke`, { method: 'PATCH', body: { reason } })
   },
@@ -156,6 +165,10 @@ export const api = {
     validateChain: () => apiClient('/audit-logs/validate'),
     createCheckpoint: (data = { externalAnchorType: 'INTERNAL_LOCAL' }) => apiClient('/audit-logs/checkpoint', { method: 'POST', body: data }),
     listCheckpoints: () => apiClient('/audit-logs/checkpoints')
+  },
+
+  audit: {
+    approveEvidence: (id) => apiClient(`/audit/evidence/${encodeURIComponent(id)}/approve`, { method: 'PATCH' })
   },
 
   // Public Verification (No Login Required)

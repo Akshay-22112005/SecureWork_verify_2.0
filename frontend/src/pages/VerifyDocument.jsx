@@ -36,6 +36,8 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
   const [error, setError] = useState('');
   const [verificationResult, setVerificationResult] = useState(null);
   const [publicData, setPublicData] = useState(null);
+  const [recordNotFound, setRecordNotFound] = useState(false);
+  const [uploadHashToast, setUploadHashToast] = useState('');
   const [tamperingSimulated, setTamperingSimulated] = useState(false);
   const [tamperLoading, setTamperLoading] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -132,6 +134,7 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
     setLoading(true);
     setVerificationResult(null);
     setPublicData(null);
+    setRecordNotFound(false);
     setReviewMessage('');
 
     try {
@@ -141,21 +144,33 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
       if (did) payload.documentId = did.trim();
 
       const [res, pubRes] = await Promise.all([
-        api.verifications.evaluate(payload),
-        cid ? api.public.verify(cid.trim()).catch(() => null) : Promise.resolve(null)
+        api.verifications.evaluate(payload).catch((err) => ({ requestError: err })),
+        cid ? api.public.verify(cid.trim()).catch((err) => ({ requestError: err })) : Promise.resolve(null)
       ]);
 
       if (res && res.success) {
         setVerificationResult(res.data);
       } else {
-        setError(res?.error?.message || 'Verification failed');
+        const evalError = res?.requestError;
+        setError(evalError?.message || res?.error?.message || 'Verification failed');
       }
 
       if (pubRes && pubRes.success) {
         setPublicData(pubRes.data);
       }
+      const has404 = [res?.requestError, pubRes?.requestError].some((requestError) => requestError?.status === 404);
+      const noRecordReturned = !res?.requestError && res?.success === false && !pubRes?.requestError && pubRes?.success === false;
+      if (has404 || noRecordReturned) {
+        setRecordNotFound(true);
+        setError('');
+      }
     } catch (err) {
-      setError(err.message || 'Verification service error');
+      if (err?.status === 404) {
+        setRecordNotFound(true);
+        setError('');
+      } else {
+        setError(err.message || 'Verification service error');
+      }
     } finally {
       setLoading(false);
     }
@@ -177,6 +192,46 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
   async function handleVerify(e) {
     if (e) e.preventDefault();
     await executeEvaluation();
+  }
+
+  async function handleDirectFile(file) {
+    if (!file) return;
+    setError('');
+    setUploadHashToast('');
+    try {
+      if (!window.crypto?.subtle) throw new Error('Secure SHA-256 hashing is unavailable in this browser.');
+      const fileBytes = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(new Error('Could not read the selected file.'));
+        reader.readAsArrayBuffer(file);
+      });
+      const digest = await window.crypto.subtle.digest('SHA-256', fileBytes);
+      const hash = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+      setCredentialId('');
+      setDocumentId('');
+      setDocumentHash(hash);
+      setUploadHashToast(`Calculated File SHA-256: ${hash.slice(0, 20)}...`);
+      await executeEvaluation('', hash, '');
+    } catch (err) {
+      setError(err.message || 'Unable to calculate the document hash.');
+    }
+  }
+
+  function handleQuickTest(kind) {
+    if (kind === 'credential') {
+      const sampleCredentialId = 'crd_0d9eaeadeb0148ac';
+      setCredentialId(sampleCredentialId);
+      setDocumentHash('');
+      setDocumentId('');
+      executeEvaluation(sampleCredentialId, '', '');
+      return;
+    }
+    const sampleHash = '931aab944aa9ce6a66a0...';
+    setCredentialId('');
+    setDocumentHash(sampleHash);
+    setDocumentId('');
+    executeEvaluation('', sampleHash, '');
   }
 
   async function handleSimulateTamper(tamperType) {
@@ -231,7 +286,8 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
   }
 
   return (
-    <div className="page-content">
+    <div className="page-content public-verify-page">
+      <div className="public-verify-container">
       {/* Workflow Navigation Banner */}
       <div className="glass-card" style={{ padding: '0.75rem 1.25rem', marginBottom: '1.25rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(0, 240, 255, 0.15)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.8rem' }}>
@@ -480,6 +536,17 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
             </div>
           )}
 
+          {recordNotFound && (
+            <div className="glass-card" role="alert" style={{ marginBottom: '1rem', padding: '1.25rem', border: '1px solid rgba(239, 68, 68, 0.35)', background: 'rgba(127, 29, 29, 0.16)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: '#fca5a5', fontWeight: 700 }}>
+                <AlertCircle size={18} /> Credential Record Not Found
+              </div>
+              <p className="text-secondary text-sm" style={{ margin: '0.5rem 0 0' }}>
+                No verification record was found for this identifier. Check the credential ID and try again.
+              </p>
+            </div>
+          )}
+
           <form onSubmit={handleVerify} className="form-grid-3">
             {candidateCredentials.length > 0 && (
               <div className="form-group" style={{ gridColumn: 'span 3', marginBottom: '0.5rem' }}>
@@ -488,7 +555,7 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
                   <span className="text-muted text-xs">Pre-loaded from accredited issuer registry</span>
                 </label>
                 <select
-                  className="select-input"
+                  className="select-input public-verification-input"
                   value={credentialId}
                   onChange={(e) => {
                     const targetId = e.target.value;
@@ -513,16 +580,26 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
               <label>Credential ID</label>
               <input
                 type="text"
+                className="public-verification-input"
                 placeholder="crd_0123456789abcdef"
                 value={credentialId}
                 onChange={(e) => setCredentialId(e.target.value)}
               />
+              <div className="public-verify-quick-tests">
+                <button type="button" className="action-btn secondary text-xs" onClick={() => handleQuickTest('credential')}>
+                  Sample Credential ID: crd_0d9eaeadeb0148ac
+                </button>
+                <button type="button" className="action-btn secondary text-xs" onClick={() => handleQuickTest('hash')}>
+                  Sample Document Hash: 931aab944aa9ce6a66a0...
+                </button>
+              </div>
             </div>
 
             <div className="form-group">
               <label>Document SHA-256 Hash</label>
               <input
                 type="text"
+                className="public-verification-input"
                 placeholder="e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
                 value={documentHash}
                 onChange={(e) => setDocumentHash(e.target.value)}
@@ -533,10 +610,37 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
               <label>Document Artifact ID (Optional)</label>
               <input
                 type="text"
+                className="public-verification-input"
                 placeholder="doc_0123456789abcdef"
                 value={documentId}
                 onChange={(e) => setDocumentId(e.target.value)}
               />
+            </div>
+
+            <div className="form-group public-verify-upload-group" style={{ gridColumn: 'span 3' }}>
+              <label htmlFor="direct-verification-file">Upload Candidate Document (.pdf, .jpg, .png)</label>
+              <div
+                className="public-verify-dropzone"
+                onDragOver={(event) => event.preventDefault()}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  handleDirectFile(event.dataTransfer.files?.[0]);
+                  event.dataTransfer.clearData();
+                }}
+              >
+                <FileText size={20} />
+                <span>Drop a candidate document here or choose a file</span>
+                <input
+                  id="direct-verification-file"
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
+                  onChange={(event) => {
+                    handleDirectFile(event.target.files?.[0]);
+                    event.target.value = '';
+                  }}
+                />
+              </div>
+              {uploadHashToast && <div className="public-verify-hash-toast" role="status"><CheckCircle2 size={14} />{uploadHashToast}</div>}
             </div>
 
             <div className="form-submit-row" style={{ gridColumn: 'span 3', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
@@ -551,13 +655,13 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
 
       {/* Recruiter / Employer Wow Verification Card */}
       {publicData && (
-        <div className="glass-card" style={{ marginBottom: '2rem', border: publicData.verified ? '1px solid rgba(16, 185, 129, 0.4)' : '1px solid rgba(239, 68, 68, 0.4)' }}>
+        <div className={`glass-card public-verification-result ${publicData?.verified ? 'is-verified' : 'is-failed'}`}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.4rem' }}>
-                <h3 style={{ fontSize: '1.3rem', margin: 0 }}>{publicData.title}</h3>
-                <StatusBadge status={publicData.status} />
-                {publicData.verified ? (
+                <h3 style={{ fontSize: '1.3rem', margin: 0 }}>{publicData?.title || 'Credential Verification'}</h3>
+                <StatusBadge status={publicData?.status || 'UNKNOWN'} />
+                {publicData?.verified ? (
                   <span className="level-badge" style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#10b981', borderColor: 'rgba(16, 185, 129, 0.4)' }}>
                     ✓ MATHEMATICALLY VALID
                   </span>
@@ -568,7 +672,7 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
                 )}
               </div>
               <p className="text-secondary text-sm" style={{ margin: 0 }}>
-                Issued by <strong>{publicData.issuer.organizationName}</strong> ({publicData.issuer.officialDomain}) • Candidate: <strong>{publicData.recipient.displayName}</strong>
+                Issued by <strong>{publicData?.organizationName || publicData?.organization?.name || publicData?.issuer?.organizationName || publicData?.issuer?.name || 'Unspecified Organization'}</strong> ({publicData?.issuer?.officialDomain || 'Domain unavailable'}) • Candidate: <strong>{publicData?.recipient?.displayName || 'Unspecified Candidate'}</strong>
               </p>
             </div>
 
@@ -576,7 +680,7 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
               <div style={{ textAlign: 'center' }}>
                 <img 
-                  src={`/api/public/qr/${publicData.credentialId}`} 
+                  src={`/api/public/qr/${publicData?.credentialId || credentialId}`} 
                   alt="Verification QR" 
                   style={{ width: '80px', height: '80px', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.15)', background: '#fff', padding: '4px' }} 
                 />
@@ -585,7 +689,7 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                 <a 
-                  href={`/api/public/pdf/${publicData.credentialId}`} 
+                  href={`/api/public/pdf/${publicData?.credentialId || credentialId}`} 
                   target="_blank" 
                   rel="noreferrer"
                   className="action-btn primary text-xs" 
@@ -594,7 +698,7 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
                   <Download size={13} /> PDF Certificate
                 </a>
                 <a 
-                  href={`/api/public/bundle/${publicData.credentialId}`} 
+                  href={`/api/public/bundle/${publicData?.credentialId || credentialId}`} 
                   target="_blank" 
                   rel="noreferrer"
                   className="action-btn secondary text-xs" 
@@ -603,7 +707,7 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
                   <FileText size={13} /> Offline Bundle (.json)
                 </a>
                 <a 
-                  href={`/api/public/w3c/${publicData.credentialId}`} 
+                  href={`/api/public/w3c/${publicData?.credentialId || credentialId}`} 
                   target="_blank" 
                   rel="noreferrer"
                   className="action-btn secondary text-xs" 
@@ -619,13 +723,13 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
           <div style={{ marginBottom: '1.5rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
               <h4 style={{ margin: 0, fontSize: '0.95rem' }}>Verification Confidence Score Breakdown</h4>
-              <strong style={{ fontSize: '1.2rem', color: publicData.confidenceScore >= 85 ? '#10b981' : (publicData.confidenceScore >= 50 ? '#f59e0b' : '#ef4444') }}>
-                {publicData.confidenceScore} / 100
+              <strong style={{ fontSize: '1.2rem', color: (publicData?.confidenceScore || 0) >= 85 ? '#10b981' : ((publicData?.confidenceScore || 0) >= 50 ? '#f59e0b' : '#ef4444') }}>
+                {publicData?.confidenceScore ?? 0} / 100
               </strong>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '0.75rem' }}>
-              {publicData.confidenceBreakdown && Object.entries(publicData.confidenceBreakdown).map(([key, factor]) => {
+              {publicData?.confidenceBreakdown && Object.entries(publicData.confidenceBreakdown).map(([key, factor]) => {
                 if (factor.advisory) return null;
                 return (
                   <div key={key} style={{ padding: '0.75rem', background: 'rgba(255,255,255,0.02)', borderRadius: '6px', border: `1px solid ${factor.passed ? 'rgba(16, 185, 129, 0.25)' : 'rgba(239, 68, 68, 0.25)'}` }}>
@@ -648,23 +752,24 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
           <div className="detail-grid-2" style={{ background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '6px' }}>
             <div>
               <span className="text-muted text-xs">SIGNATURE ALGORITHM:</span>
-              <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{publicData.cryptography.algorithm} (RFC 8785 JCS)</div>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600 }}>{publicData?.cryptography?.algorithm || 'Unavailable'} (RFC 8785 JCS)</div>
             </div>
             <div>
               <span className="text-muted text-xs">SIGNATURE FINGERPRINT:</span>
-              <div className="code-snippet hash-text text-xs">{publicData.cryptography.signatureFingerprint || 'UNSIGNED'}...</div>
+              <div className="code-snippet hash-text text-xs">{publicData?.cryptography?.signatureFingerprint || 'UNSIGNED'}...</div>
             </div>
             <div>
               <span className="text-muted text-xs">AUDIT-CHAIN HEAD PROOF:</span>
-              <div className="code-snippet hash-text text-xs">Block #{publicData.auditProof.sequenceNumber} ({publicData.auditProof.entryHash ? publicData.auditProof.entryHash.slice(0, 16) : 'GENESIS'}...)</div>
+              <div className="code-snippet hash-text text-xs">Block #{publicData?.auditProof?.sequenceNumber ?? '—'} ({publicData?.auditProof?.entryHash ? publicData.auditProof.entryHash.slice(0, 16) : 'GENESIS'}...)</div>
             </div>
             <div>
               <span className="text-muted text-xs">SHAREABLE VERIFY LINK:</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '2px' }}>
                 <input 
                   type="text" 
+                  className="public-verification-input"
                   readOnly 
-                  value={`${window.location.origin}/verify/${publicData.credentialId}`} 
+                  value={`${window.location.origin}/verify/${publicData?.credentialId || credentialId}`} 
                   style={{ fontSize: '0.75rem', padding: '4px 8px' }}
                 />
                 <button className="action-btn secondary text-xs" onClick={handleCopyShareLink}>
@@ -802,6 +907,7 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

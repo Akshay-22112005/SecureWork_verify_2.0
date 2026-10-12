@@ -102,6 +102,7 @@ export default function AdminOrganizationDetail({ onNavigate }) {
   const [registeringTrustedSource, setRegisteringTrustedSource] = useState(false);
   const [trustedSourceError, setTrustedSourceError] = useState('');
   const [verifyingTrustedSource, setVerifyingTrustedSource] = useState('');
+  const [issuerAction, setIssuerAction] = useState('');
   const [bulkCsvText, setBulkCsvText] = useState('');
   const [bulkRows, setBulkRows] = useState([]);
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -451,6 +452,27 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
     }
   }
 
+  async function runOrganizationIssuerAction(issuer, action) {
+    const key = `${issuer.issuerId}:${action}`;
+    if (action === 'revoke' && !confirm(`Revoke issuer ${issuer.issuerId}?`)) return;
+    const reason = action === 'suspend' ? prompt('Enter suspension reason:', 'Issuer compliance audit pending') : undefined;
+    if (action === 'suspend' && !reason) return;
+    setIssuerAction(key);
+    setError('');
+    try {
+      if (action === 'approve') await api.admin.approveOrganizationIssuer(organization.organizationId, issuer.issuerId);
+      if (action === 'suspend') await api.admin.suspendOrganizationIssuer(organization.organizationId, issuer.issuerId, reason);
+      if (action === 'revoke') await api.admin.revokeOrganizationIssuer(organization.organizationId, issuer.issuerId);
+      const actionLabel = action === 'approve' ? 'activated' : action === 'suspend' ? 'suspended' : 'revoked';
+      setMessage(`Issuer ${issuer.issuerId} ${actionLabel}.`);
+      await loadRelatedResources(organization);
+    } catch (err) {
+      setError(err.message || `Failed to ${action} issuer.`);
+    } finally {
+      setIssuerAction('');
+    }
+  }
+
   async function handleVerifyUser() {
     setModalError('');
     setVerifiedUser(null);
@@ -481,14 +503,12 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
     setRegisteringIssuer(true);
     try {
       const code = `ISS_${(organization.organizationCode || organization.organizationId).replace(/[^A-Z0-9]/gi, '_').toUpperCase()}_${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-      const res = await api.issuers.register({
-        organizationId: organization.organizationId,
+      const res = await api.admin.registerOrganizationIssuer(organization.organizationId, {
         userId: verifiedUser.userId,
         issuerCode: code
       });
       const issuer = res?.data?.issuer || res?.issuer;
       if (!issuer?.issuerId) throw new Error('Issuer registration did not return an issuer ID.');
-      await api.issuers.approve(issuer.issuerId);
       setShowRegisterModal(false);
       setIssuerEmail('');
       setVerifiedUser(null);
@@ -580,22 +600,22 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
         </div>
 
         {/* Action Buttons */}
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button className="action-btn secondary text-xs" onClick={fetchOrg} disabled={loading}>
+        <div className="flex items-center space-x-3" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <button className="action-btn secondary text-xs" onClick={fetchOrg} disabled={loading} style={{ minHeight: '36px', height: '36px', padding: '0 0.75rem', borderRadius: '0.5rem', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
             <RefreshCw size={13} className={loading ? 'pulse-dot' : ''} /> Refresh
           </button>
           {organization.organizationVerificationStatus !== 'VERIFIED' && organization.organizationVerificationStatus !== 'REVOKED' && (
-            <button className="action-btn primary text-xs" onClick={handleVerify}>
+            <button className="action-btn primary text-xs" onClick={handleVerify} style={{ minHeight: '36px', height: '36px', padding: '0 0.75rem', borderRadius: '0.5rem', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
               <ShieldCheck size={13} /> Verify & Accredit
             </button>
           )}
           {organization.organizationVerificationStatus === 'VERIFIED' && (
-            <button className="action-btn secondary text-xs" onClick={handleSuspend}>
+            <button className="action-btn secondary text-xs" onClick={handleSuspend} style={{ minHeight: '36px', height: '36px', padding: '0 0.75rem', borderRadius: '0.5rem', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
               <AlertTriangle size={13} /> Suspend Trust
             </button>
           )}
           {organization.organizationVerificationStatus !== 'REVOKED' && (
-            <button className="action-btn danger text-xs" onClick={handleRevoke}>
+            <button className="action-btn danger text-xs" onClick={handleRevoke} style={{ minHeight: '36px', height: '36px', padding: '0 0.75rem', borderRadius: '0.5rem', boxSizing: 'border-box', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.35rem', whiteSpace: 'nowrap' }}>
               <ShieldAlert size={13} /> Revoke
             </button>
           )}
@@ -748,9 +768,6 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
             <button className="action-btn primary text-xs" onClick={openRegisterModal}>
               + Register Issuer
             </button>
-            <button className="action-btn secondary text-xs" onClick={() => navigate('/admin/issuers')}>
-              Go to Issuers Management →
-            </button>
           </div>
           {loadingResources ? (
             <div className="empty-state">Loading accredited issuers...</div>
@@ -784,31 +801,49 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
                     <td className="code-snippet">{issuer.issuerId}</td>
                     <td><strong>{issuer.issuerCode}</strong></td>
                     <td><StatusBadge status={issuer.status} /></td>
-                    <td className="code-snippet">{issuer.publicKeyId || 'Pending'}</td>
+                    <td>
+                      {issuer.publicKeyId ? (
+                        <span className="code-snippet">{issuer.publicKeyId}</span>
+                      ) : (
+                        <span className="badge-tag" style={{ color: '#fbbf24', borderColor: 'rgba(251, 191, 36, 0.35)', background: 'rgba(251, 191, 36, 0.08)' }}>
+                          Pending Key Generation
+                        </span>
+                      )}
+                    </td>
                     <td>{issuer.createdAt ? new Date(issuer.createdAt).toLocaleDateString() : 'N/A'}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.4rem' }}>
                         {issuer.status === 'PENDING' && (
                           <button
                             className="action-btn primary text-xs"
-                            onClick={() => handleApproveIssuer(issuer.issuerId)}
+                            onClick={() => runOrganizationIssuerAction(issuer, 'approve')}
+                            disabled={issuerAction === `${issuer.issuerId}:approve`}
                             style={{ padding: '0.2rem 0.5rem' }}
                           >
-                            Approve
+                            {issuerAction === `${issuer.issuerId}:approve` ? 'Approving…' : 'Approve'}
                           </button>
                         )}
                         {(issuer.status === 'ACTIVE' || issuer.status === 'APPROVED') && (
-                          <span className="text-xs text-emerald-400 font-medium">Active</span>
-                        )}
-                        {issuer.status === 'APPROVED' && (
                           <button
                             className="action-btn secondary text-xs"
-                            onClick={() => handleSuspendIssuer(issuer.issuerId)}
+                            onClick={() => runOrganizationIssuerAction(issuer, 'suspend')}
+                            disabled={issuerAction === `${issuer.issuerId}:suspend`}
                             style={{ padding: '0.2rem 0.5rem' }}
                           >
-                            Suspend
+                            {issuerAction === `${issuer.issuerId}:suspend` ? 'Suspending…' : 'Suspend'}
                           </button>
                         )}
+                        {(issuer.status === 'ACTIVE' || issuer.status === 'APPROVED') && (
+                          <button className="action-btn danger text-xs" onClick={() => runOrganizationIssuerAction(issuer, 'revoke')} disabled={issuerAction === `${issuer.issuerId}:revoke`} style={{ padding: '0.2rem 0.5rem' }}>
+                            {issuerAction === `${issuer.issuerId}:revoke` ? 'Revoking…' : 'Revoke'}
+                          </button>
+                        )}
+                        {issuer.status === 'SUSPENDED' && (
+                          <button className="action-btn primary text-xs" onClick={() => runOrganizationIssuerAction(issuer, 'approve')} disabled={issuerAction === `${issuer.issuerId}:approve`} style={{ padding: '0.2rem 0.5rem' }}>
+                            {issuerAction === `${issuer.issuerId}:approve` ? 'Activating…' : 'Activate'}
+                          </button>
+                        )}
+                        {issuer.status === 'REVOKED' && <span className="text-muted text-xs">Revoked</span>}
                       </div>
                     </td>
                   </tr>

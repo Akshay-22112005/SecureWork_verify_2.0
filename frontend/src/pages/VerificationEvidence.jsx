@@ -11,6 +11,32 @@ export default function VerificationEvidence({ initialParams = {}, onNavigate })
   const [error, setError] = useState('');
   const [search, setSearch] = useState(initialParams.verificationId || '');
   const [selectedEvidence, setSelectedEvidence] = useState(null);
+  const [approvingEvidence, setApprovingEvidence] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [approvalError, setApprovalError] = useState('');
+
+  async function approveEvidenceRecord(targetEvidence) {
+    const evidenceId = targetEvidence?.evidenceId || targetEvidence?._id;
+    if (!evidenceId || approvingEvidence) return;
+    setApprovingEvidence(true);
+    setApprovalError('');
+    try {
+      const res = await api.audit.approveEvidence(evidenceId);
+      const updatedEvidence = res?.data?.evidence || { ...targetEvidence, status: 'VERIFIED', evidenceStatus: 'VERIFIED' };
+      if ((selectedEvidence?.evidenceId || selectedEvidence?._id) === evidenceId) setSelectedEvidence(updatedEvidence);
+      setEvidenceList((current) => current.map((item) => (
+        (item.evidenceId || item._id) === evidenceId
+          ? { ...item, ...updatedEvidence, status: 'VERIFIED', evidenceStatus: 'VERIFIED' }
+          : item
+      )));
+      setToastMessage('Evidence approved and verified.');
+      window.setTimeout(() => setToastMessage(''), 3500);
+    } catch (err) {
+      setApprovalError(err.message || 'Could not approve evidence. Please try again.');
+    } finally {
+      setApprovingEvidence(false);
+    }
+  }
 
   async function loadEvidence() {
     setLoading(true);
@@ -58,7 +84,7 @@ export default function VerificationEvidence({ initialParams = {}, onNavigate })
               sourceId: v.issuerId || 'INTERNAL',
               credentialIdentifier: v.credentialId,
               documentHash: v.documentHash,
-              evidenceStatus: v.cryptographicStatus === 'PASSED' ? 'CONFIRMED' : 'PENDING',
+              evidenceStatus: v.cryptographicStatus === 'PASSED' ? 'VERIFIED' : 'PENDING',
               createdAt: v.evaluatedAt || v.createdAt
             });
           })
@@ -99,7 +125,17 @@ export default function VerificationEvidence({ initialParams = {}, onNavigate })
   });
 
   return (
-    <div className="page-content">
+    <div className="page-content verification-evidence-page">
+      {toastMessage && (
+        <div role="status" className="glass-card" style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 1200, padding: '0.8rem 1rem', border: '1px solid rgba(16, 185, 129, 0.35)', color: '#34d399', background: 'rgba(2, 6, 23, 0.96)' }}>
+          <ShieldCheck size={15} style={{ verticalAlign: 'middle', marginRight: '0.5rem' }} />{toastMessage}
+        </div>
+      )}
+      {approvalError && !selectedEvidence && (
+        <div role="alert" className="glass-card" style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 1200, padding: '0.8rem 1rem', border: '1px solid rgba(239, 68, 68, 0.35)', color: '#fca5a5', background: 'rgba(2, 6, 23, 0.96)' }}>
+          {approvalError}
+        </div>
+      )}
       {/* Workflow Navigation Banner */}
       <div className="glass-card" style={{ padding: '0.75rem 1.25rem', marginBottom: '1.25rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(0, 240, 255, 0.15)' }}>
         {(isAuditor || role === 'AUDITOR') ? (
@@ -236,7 +272,25 @@ export default function VerificationEvidence({ initialParams = {}, onNavigate })
                   <td><span className="badge-tag">{item.evidenceType}</span></td>
                   <td className="code-snippet text-muted">{item.sourceId}</td>
                   <td>{item.credentialIdentifier || 'N/A'}</td>
-                  <td><StatusBadge status={item.evidenceStatus} /></td>
+                  <td>
+                    {item.evidenceStatus === 'PENDING' && (isAuditor || role === 'AUDITOR' || isAdmin) && (item.evidenceId || item._id) ? (
+                      <button
+                        type="button"
+                        className="status-badge warning sm"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          approveEvidenceRecord(item);
+                        }}
+                        disabled={approvingEvidence}
+                        title="Approve this evidence and mark it verified"
+                      >
+                        <span className="pulse-dot" aria-hidden="true" />
+                        <span className="badge-text">PENDING · Approve</span>
+                      </button>
+                    ) : (
+                      <StatusBadge status={item.evidenceStatus} />
+                    )}
+                  </td>
                   <td className="text-muted text-xs">{new Date(item.createdAt).toLocaleString()}</td>
                   <td>
                     <button 
@@ -300,12 +354,23 @@ export default function VerificationEvidence({ initialParams = {}, onNavigate })
 
               {onNavigate && (
                 <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem', paddingTop: '1rem', borderTop: '1px solid var(--border-subtle)' }}>
-                  <button 
-                    className="action-btn secondary text-xs"
-                    onClick={() => setSelectedEvidence(null)}
-                  >
-                    Close
-                  </button>
+                  <div style={{ display: 'flex', gap: '0.6rem' }}>
+                    {selectedEvidence.evidenceId && selectedEvidence.evidenceStatus === 'PENDING' && (isAuditor || role === 'AUDITOR' || isAdmin) && (
+                      <button
+                        className="action-btn primary text-xs"
+                        onClick={() => approveEvidenceRecord(selectedEvidence)}
+                        disabled={approvingEvidence}
+                      >
+                        <ShieldCheck size={13} /> {approvingEvidence ? 'Approving…' : 'Approve Evidence'}
+                      </button>
+                    )}
+                    <button
+                      className="action-btn secondary text-xs"
+                      onClick={() => setSelectedEvidence(null)}
+                    >
+                      Close
+                    </button>
+                  </div>
                   <div style={{ display: 'flex', gap: '0.6rem' }}>
                     <button 
                       className="action-btn primary text-xs"
@@ -333,6 +398,7 @@ export default function VerificationEvidence({ initialParams = {}, onNavigate })
                   </div>
                 </div>
               )}
+              {approvalError && <div className="alert-banner danger" role="alert" style={{ marginTop: '0.75rem' }}>{approvalError}</div>}
             </div>
           </div>
         </div>

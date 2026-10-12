@@ -13,6 +13,8 @@ export default function KeyStatus({ onNavigate }) {
   const [activeIssuer, setActiveIssuer] = useState(null);
   const [loading, setLoading] = useState(true);
   const [rotating, setRotating] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [keyFingerprint, setKeyFingerprint] = useState('');
   const [actionMessage, setActionMessage] = useState("");
   const [actionError, setActionError] = useState("");
   const [compromiseTarget, setCompromiseTarget] = useState(null);
@@ -25,7 +27,10 @@ export default function KeyStatus({ onNavigate }) {
       const issuerRes = await api.issuers.list();
       let issuer = null;
       if (issuerRes?.success && issuerRes.data.issuers?.length > 0) {
-        issuer = issuerRes.data.issuers.find((i) => i.userId === user?.userId) || issuerRes.data.issuers[0];
+        const issuerList = issuerRes.data.issuers;
+        issuer = issuerList.find((i) => i.userId === user?.userId || i.issuerId === user?.issuerId) ||
+          issuerList.find((i) => user?.organizationId && String(i.organizationId) === String(user.organizationId)) ||
+          issuerList[0];
         setActiveIssuer(issuer);
       }
       if (issuer) {
@@ -38,12 +43,52 @@ export default function KeyStatus({ onNavigate }) {
 
   useEffect(() => { loadKeys(); }, [user]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function calculateFingerprint() {
+      const publicKey = keys.find((key) => key.status === 'ACTIVE')?.publicKeyPem || keys.find((key) => key.status === 'ACTIVE')?.publicKey;
+      if (!publicKey || !window.crypto?.subtle) {
+        setKeyFingerprint('');
+        return;
+      }
+      try {
+        const digest = await window.crypto.subtle.digest('SHA-256', new TextEncoder().encode(publicKey));
+        const fingerprint = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('').toUpperCase();
+        if (!cancelled) setKeyFingerprint(fingerprint.match(/.{1,4}/g).join(':'));
+      } catch {
+        if (!cancelled) setKeyFingerprint('');
+      }
+    }
+    calculateFingerprint();
+    return () => { cancelled = true; };
+  }, [keys]);
+
+  async function handleGenerateKey() {
+    if (!activeIssuer) return;
+    setActionMessage('');
+    setActionError('');
+    setGenerating(true);
+    try {
+      const res = await api.issuerKeys.generate({
+        issuerId: activeIssuer.issuerId,
+        organizationId: activeIssuer.organizationId
+      });
+      if (!res?.success) throw new Error(res?.error?.message || 'The server did not confirm key generation.');
+      await loadKeys();
+      setActionMessage('Ed25519 Key Pair Generated Successfully');
+    } catch (err) {
+      setActionError(err.message || 'Key generation failed');
+    } finally {
+      setGenerating(false);
+    }
+  }
+
   async function handleRotateKey() {
     if (!activeIssuer) return;
     if (!confirm("Rotate active Ed25519 key? All future credentials will be signed with the new key while existing credentials remain valid.")) return;
     setActionMessage(""); setActionError(""); setRotating(true);
     try {
-      const res = await api.issuerKeys.rotate(activeIssuer.issuerId);
+      const res = await api.issuerKeys.rotate(activeIssuer.issuerId, { organizationId: activeIssuer.organizationId });
       if (res?.success) { setActionMessage("Cryptographic key rotated successfully. New Ed25519 key generated."); loadKeys(); }
     } catch (err) { setActionError(err.message || "Key rotation failed"); }
     finally { setRotating(false); }
@@ -156,7 +201,7 @@ export default function KeyStatus({ onNavigate }) {
         </div>
       </div>
 
-      {actionMessage && <div className="alert-banner success" style={{ marginBottom: "1rem" }}><CheckCircle2 size={16} /><span>{actionMessage}</span></div>}
+      {actionMessage && <div role="status" className="glass-card" style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 1200, padding: '0.8rem 1rem', border: '1px solid rgba(16, 185, 129, 0.35)', color: '#34d399', background: 'rgba(2, 6, 23, 0.96)' }}><CheckCircle2 size={16} style={{ verticalAlign: 'middle', marginRight: '0.5rem' }} />{actionMessage}</div>}
       {actionError && <div className="alert-banner danger" style={{ marginBottom: "1rem" }}><AlertTriangle size={16} /><span>{actionError}</span></div>}
 
       {/* Active Key */}
@@ -191,6 +236,7 @@ export default function KeyStatus({ onNavigate }) {
           <div>
             <div className="detail-row"><span className="detail-label">Key ID</span><span className="code-snippet">{activeKey.keyId}</span></div>
             <div className="detail-row"><span className="detail-label">Algorithm</span><span><strong>{activeKey.algorithm || "ED25519"}</strong> (High-performance elliptic curve)</span></div>
+            <div className="detail-row"><span className="detail-label">Public Key Fingerprint (SHA-256)</span><span className="code-snippet hash-text">{keyFingerprint || 'Calculating…'}</span></div>
             <div className="detail-row">
               <span className="detail-label">Public Key (PEM)</span>
               <div className="json-code-box" style={{ maxHeight: "120px" }}><pre>{activeKey.publicKeyPem || activeKey.publicKey}</pre></div>
@@ -214,7 +260,7 @@ export default function KeyStatus({ onNavigate }) {
           <div className="empty-state">
             <Key size={36} style={{ opacity: 0.3, marginBottom: "0.75rem" }} />
             <p>No active signing key registered for this issuer.</p>
-            {activeIssuer && <button className="action-btn primary text-xs" onClick={handleRotateKey} style={{ marginTop: "0.5rem" }}>Generate First Ed25519 Key</button>}
+            {activeIssuer && <button className="action-btn primary text-xs" onClick={handleGenerateKey} disabled={generating || activeIssuer.status !== 'ACTIVE'} style={{ marginTop: "0.5rem" }}>{generating ? 'Generating Ed25519 Key…' : 'Generate First Ed25519 Key'}</button>}
           </div>
         )}
       </div>

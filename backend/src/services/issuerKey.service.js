@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const IssuerKey = require('../models/issuerKey.model');
 const Issuer = require('../models/issuer.model');
+const Organization = require('../models/organization.model');
 const { keyStorage, generateEd25519KeyPair, signEd25519, verifyEd25519 } = require('./crypto');
 const auditService = require('./audit.service');
 const notificationService = require('./notification.service');
@@ -21,13 +22,41 @@ class IssuerKeyService {
     if (actorUser.role === 'ADMIN') {
       return true;
     }
-    const issuer = await Issuer.findOne({
+    let issuer = await Issuer.findOne({
       $or: [{ issuerId }, { issuerCode: issuerId }]
     });
     if (!issuer) {
+      issuer = await Issuer.findOne({ organizationId: issuerId });
+    }
+    if (!issuer) {
       throw new NotFoundError('Issuer profile not found', 'ISSUER_NOT_FOUND');
     }
-    if (issuer.userId !== actorUser.userId) {
+    const actorUserIds = [actorUser.userId, actorUser._id, actorUser.id]
+      .filter(Boolean)
+      .map(String);
+    const ownsIssuer = actorUserIds.includes(String(issuer.userId));
+    const actorOrganizationIds = [
+      actorUser.organizationId,
+      actorUser.organization?.organizationId,
+      actorUser.organization?.organizationCode
+    ].filter(Boolean).map(String);
+    let belongsToIssuerOrganization = actorOrganizationIds.includes(String(issuer.organizationId));
+    if (!belongsToIssuerOrganization && actorUser.organizationId) {
+      const actorOrganization = await Organization.findOne({
+        $or: [
+          { organizationId: String(actorUser.organizationId) },
+          { organizationCode: String(actorUser.organizationId).toUpperCase() },
+          { _id: /^[0-9a-fA-F]{24}$/.test(String(actorUser.organizationId)) ? actorUser.organizationId : null }
+        ]
+      });
+      belongsToIssuerOrganization = Boolean(actorOrganization && [
+        actorOrganization.organizationId,
+        actorOrganization.organizationCode,
+        String(actorOrganization._id)
+      ].map(String).includes(String(issuer.organizationId)));
+    }
+    const matchesIssuerContext = actorUser.issuerId && String(actorUser.issuerId) === String(issuer.issuerId);
+    if (!ownsIssuer && !belongsToIssuerOrganization && !matchesIssuerContext) {
       throw new ForbiddenError('You do not have permission to manage keys for this issuer', 'FORBIDDEN');
     }
     return true;
@@ -40,12 +69,17 @@ class IssuerKeyService {
    * @param {object} actorUser
    * @returns {Promise<object>} Created IssuerKey document (public metadata only)
    */
-  async generateKeyForIssuer(issuerId, actorUser) {
-    await this.checkAuthorization(issuerId, actorUser);
+  async generateKeyForIssuer(issuerId, actorUser, { authorizationAlreadyVerified = false } = {}) {
+    if (!authorizationAlreadyVerified) {
+      await this.checkAuthorization(issuerId, actorUser);
+    }
 
-    const issuer = await Issuer.findOne({
+    let issuer = await Issuer.findOne({
       $or: [{ issuerId }, { issuerCode: issuerId }]
     });
+    if (!issuer) {
+      issuer = await Issuer.findOne({ organizationId: issuerId });
+    }
     if (!issuer) {
       throw new NotFoundError('Issuer profile not found', 'ISSUER_NOT_FOUND');
     }
@@ -56,6 +90,9 @@ class IssuerKeyService {
         'ISSUER_NOT_ACTIVE'
       );
     }
+
+    const existingActiveKey = await IssuerKey.findOne({ issuerId: issuer.issuerId, status: 'ACTIVE' });
+    if (existingActiveKey) return existingActiveKey.toJSON();
 
     // 1. Generate Ed25519 keypair
     const { publicKeyPem, privateKeyPem } = generateEd25519KeyPair();
@@ -87,7 +124,54 @@ class IssuerKeyService {
       }
     );
 
+    await auditService.appendLog({
+      action: 'KEY_PAIR_GENERATED',
+      performedBy: actorUser.userId || actorUser._id || 'SYSTEM',
+      targetType: 'ISSUER_KEY',
+      targetId: keyId,
+      metadata: { issuerId: issuer.issuerId, organizationId: issuer.organizationId, algorithm: 'ED25519' }
+    });
+
     return issuerKey.toJSON();
+  }
+
+  /**
+   * Ensure the demo issuer has an active key whose private material is available.
+   * This is used only after the caller has already authorized credential issuance.
+   */
+  async ensureUsableActiveKeyForIssuer(issuerId, actorUser, { authorizationAlreadyVerified = false } = {}) {
+    if (!authorizationAlreadyVerified) {
+      await this.checkAuthorization(issuerId, actorUser);
+    }
+
+    const issuer = await Issuer.findOne({ $or: [{ issuerId }, { issuerCode: issuerId }] });
+    if (!issuer) {
+      throw new NotFoundError('Issuer profile not found', 'ISSUER_NOT_FOUND');
+    }
+    if (issuer.status !== 'ACTIVE') {
+      throw new ValidationError('Cannot issue credentials for an inactive issuer', 'ISSUER_NOT_ACTIVE');
+    }
+
+    let activeKey = await IssuerKey.findOne({ issuerId: issuer.issuerId, status: 'ACTIVE' });
+    if (activeKey && await keyStorage.hasPrivateKey(activeKey.keyId)) {
+      return activeKey.toJSON();
+    }
+
+    if (activeKey) {
+      activeKey.status = 'RETIRED';
+      activeKey.retiredAt = new Date();
+      activeKey.statusReason = 'Private key material was unavailable; replaced during credential issuance';
+      await activeKey.save();
+      await auditService.recordEvent(
+        actorUser?.userId,
+        actorUser?.role,
+        'ISSUER_KEY_RETIRED',
+        activeKey.keyId,
+        { issuerId: issuer.issuerId, reason: activeKey.statusReason }
+      );
+    }
+
+    return this.generateKeyForIssuer(issuer.issuerId, actorUser, { authorizationAlreadyVerified: true });
   }
 
   /**
@@ -99,9 +183,10 @@ class IssuerKeyService {
    * @returns {Promise<object>} Newly generated active IssuerKey
    */
   async rotateIssuerKey(issuerId, actorUser) {
-    const issuer = await Issuer.findOne({
+    let issuer = await Issuer.findOne({
       $or: [{ issuerId }, { issuerCode: issuerId }]
     });
+    if (!issuer) issuer = await Issuer.findOne({ organizationId: issuerId });
     if (!issuer) {
       throw new NotFoundError('Issuer profile not found', 'ISSUER_NOT_FOUND');
     }
@@ -110,11 +195,7 @@ class IssuerKeyService {
       throw new ForbiddenError('Authenticated user required', 'UNAUTHORIZED');
     }
 
-    if (actorUser.role !== 'ADMIN') {
-      if (issuer.userId !== actorUser.userId) {
-        throw new ForbiddenError('You do not have permission to rotate keys for this issuer', 'FORBIDDEN');
-      }
-    }
+    await this.checkAuthorization(issuer.issuerId, actorUser);
 
     if (issuer.status !== 'ACTIVE') {
       throw new ValidationError(

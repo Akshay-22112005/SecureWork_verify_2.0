@@ -3,10 +3,26 @@ import { Shield, Lock, Mail, AlertCircle, ArrowRight, Eye, EyeOff } from 'lucide
 import { useAuth } from '../context/AuthContext';
 import { useLocation, useNavigate } from 'react-router-dom';
 import AnimatedBackground from '../components/AnimatedBackground';
-import { getDefaultDashboard } from '../config/permissions';
+import { getDefaultDashboard, hasRouteAccess, ROUTE_PERMISSIONS } from '../config/permissions';
+
+function getPostLoginDestination(role, requestedPath) {
+  if (!requestedPath || requestedPath === '/' || requestedPath === '/login') {
+    return getDefaultDashboard(role);
+  }
+  if (hasRouteAccess(role, requestedPath)) return requestedPath;
+  if (role === 'ADMIN') return requestedPath;
+
+  // Preserve safe deep links (for example, /verify/:credentialId) by checking
+  // the nearest configured route base against the signed-in role.
+  const routeBase = Object.keys(ROUTE_PERMISSIONS)
+    .filter((path) => requestedPath.startsWith(`${path}/`))
+    .sort((left, right) => right.length - left.length)[0];
+  if (routeBase && hasRouteAccess(role, routeBase)) return requestedPath;
+  return getDefaultDashboard(role);
+}
 
 export default function Login({ onNavigate }) {
-  const { login, isAuthenticated, loading, user } = useAuth();
+  const { login, logout, isAuthenticated, loading, user } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
@@ -31,11 +47,7 @@ export default function Login({ onNavigate }) {
   // If user is already authenticated (valid session), redirect to role-specific dashboard
   useEffect(() => {
     if (!loading && isAuthenticated && user) {
-      if (fromPath && fromPath !== '/login' && fromPath !== '/') {
-        navigate(fromPath, { replace: true });
-      } else {
-        navigate(getDefaultDashboard(user.role), { replace: true });
-      }
+      navigate(getPostLoginDestination(user.role, fromPath), { replace: true });
     }
   }, [isAuthenticated, loading, user, fromPath, navigate]);
 
@@ -53,7 +65,7 @@ export default function Login({ onNavigate }) {
       // If came from persona switcher, verify role matches
       if (activePersona && loggedInUser.role !== activePersona) {
         // Role mismatch — logout and show error
-        const { logout } = await import('../context/AuthContext');
+        logout();
         setError(
           `This account has role "${loggedInUser.role}", but "${activePersona}" is required. ` +
           `Please sign in with a ${activePersona} account.`
@@ -63,13 +75,14 @@ export default function Login({ onNavigate }) {
       }
 
       // Navigate back to original location or role home page
-      if (fromPath && fromPath !== '/login' && fromPath !== '/') {
-        navigate(fromPath, {
+      const destination = getPostLoginDestination(loggedInUser.role, fromPath);
+      if (destination === fromPath && fromPath && fromPath !== '/login' && fromPath !== '/') {
+        navigate(destination, {
           replace: true,
           state: prefillCredentialId ? { credentialId: prefillCredentialId, autoVerify: true } : undefined
         });
       } else {
-        navigate(getDefaultDashboard(loggedInUser.role), { replace: true });
+        navigate(destination, { replace: true });
       }
     } catch (err) {
       setError(err.message || 'Invalid email or password');

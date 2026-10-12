@@ -21,7 +21,9 @@ async function seedAdmin(options = {}) {
     const adminEmail = (options.email || process.env.ADMIN_EMAIL || 'admin@securework.local').toLowerCase().trim();
     const adminName = options.name || process.env.ADMIN_NAME || 'System Administrator';
 
-    let adminPassword = options.password || process.env.ADMIN_PASSWORD;
+    // Keep the advertised development preset usable across persistent local databases.
+    // Production still requires an explicitly configured password or a generated one on first seed.
+    let adminPassword = options.password || process.env.ADMIN_PASSWORD || (env.NODE_ENV === 'production' ? undefined : 'AdminSecurePass123!');
 
     // 1. Ensure primary ADMIN account exists
     let adminUser = await User.findOne({ email: adminEmail });

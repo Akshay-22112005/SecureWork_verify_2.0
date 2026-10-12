@@ -31,6 +31,11 @@ const IssuerSchema = new mongoose.Schema({
     required: [true, 'Organization ID is required'],
     index: true
   },
+  publicKeyId: {
+    type: String,
+    default: null,
+    index: true
+  },
   authorizationEvidence: {
     type: mongoose.Schema.Types.Mixed,
     default: {}

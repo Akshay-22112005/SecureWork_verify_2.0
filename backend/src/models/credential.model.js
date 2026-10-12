@@ -35,6 +35,11 @@ const CredentialSchema = new mongoose.Schema({
     required: [true, 'Recipient ID is required'],
     index: true
   },
+  createdBy: {
+    type: String,
+    default: null,
+    index: true
+  },
   credentialType: {
     type: String,
     enum: CREDENTIAL_TYPES,

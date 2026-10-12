@@ -24,7 +24,7 @@ export const ROUTE_PERMISSIONS = {
   '/dashboard': ['ADMIN', 'USER', 'MEMBER', 'ISSUER', 'HR', 'AUDITOR'],
   '/upload': ['ADMIN', 'USER', 'MEMBER'],
   '/credentials': ['ADMIN', 'USER', 'MEMBER'],
-  '/history': ['ADMIN', 'USER', 'HR', 'MEMBER'],
+  '/history': ['ADMIN', 'USER', 'HR', 'MEMBER', 'AUDITOR'],
   '/analysis': ['ADMIN', 'USER', 'MEMBER'],
   '/verify': ['ADMIN', 'HR', 'USER', 'MEMBER'],
   '/credentials/issue': ['ADMIN', 'ISSUER'],

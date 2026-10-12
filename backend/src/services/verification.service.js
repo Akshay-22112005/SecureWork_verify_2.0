@@ -124,7 +124,8 @@ class VerificationService {
         documentHash: input.documentHash || null,
         signaturePresent: Boolean(checks.digitalSignature.passed !== undefined),
         signatureValid: Boolean(checks.digitalSignature.passed),
-        evidenceStatus: checks.digitalSignature.passed ? 'CONFIRMED' : 'CONTRADICTED',
+        status: checks.digitalSignature.passed ? 'VERIFIED' : 'CONTRADICTED',
+        evidenceStatus: checks.digitalSignature.passed ? 'VERIFIED' : 'CONTRADICTED',
         sourceResponseSummary: { detail: checks.digitalSignature.detail }
       });
     }
@@ -136,7 +137,8 @@ class VerificationService {
         evidenceType: 'HASH_MATCH',
         credentialIdentifier: input.credentialId || null,
         documentHash: input.documentHash || null,
-        evidenceStatus: checks.documentIntegrity.passed ? 'CONFIRMED' : 'CONTRADICTED',
+        status: checks.documentIntegrity.passed ? 'VERIFIED' : 'CONTRADICTED',
+        evidenceStatus: checks.documentIntegrity.passed ? 'VERIFIED' : 'CONTRADICTED',
         sourceResponseSummary: { detail: checks.documentIntegrity.detail }
       });
     }
@@ -147,7 +149,8 @@ class VerificationService {
         verificationId,
         evidenceType: 'ISSUER_STATUS',
         credentialIdentifier: input.credentialId || null,
-        evidenceStatus: checks.issuerAuthorization.passed ? 'CONFIRMED' : 'CONTRADICTED',
+        status: checks.issuerAuthorization.passed ? 'VERIFIED' : 'CONTRADICTED',
+        evidenceStatus: checks.issuerAuthorization.passed ? 'VERIFIED' : 'CONTRADICTED',
         sourceResponseSummary: { detail: checks.issuerAuthorization.detail }
       });
     }
@@ -158,7 +161,8 @@ class VerificationService {
         verificationId,
         evidenceType: 'CREDENTIAL_STATUS',
         credentialIdentifier: input.credentialId || null,
-        evidenceStatus: checks.credentialStatus.passed ? 'CONFIRMED' : 'CONTRADICTED',
+        status: checks.credentialStatus.passed ? 'VERIFIED' : 'CONTRADICTED',
+        evidenceStatus: checks.credentialStatus.passed ? 'VERIFIED' : 'CONTRADICTED',
         sourceResponseSummary: { detail: checks.credentialStatus.detail }
       });
     }
@@ -169,7 +173,8 @@ class VerificationService {
         verificationId,
         evidenceType: 'DOMAIN_VERIFICATION',
         credentialIdentifier: input.credentialId || null,
-        evidenceStatus: checks.sourceTrust.passed ? 'CONFIRMED' : 'CONTRADICTED',
+        status: checks.sourceTrust.passed ? 'VERIFIED' : 'CONTRADICTED',
+        evidenceStatus: checks.sourceTrust.passed ? 'VERIFIED' : 'CONTRADICTED',
         sourceResponseSummary: { detail: checks.sourceTrust.detail }
       });
     }
@@ -180,7 +185,8 @@ class VerificationService {
         verificationId,
         evidenceType: 'IDENTITY_EVIDENCE',
         credentialIdentifier: input.credentialId || null,
-        evidenceStatus: checks.recipientBinding.passed ? 'CONFIRMED' : 'CONTRADICTED',
+        status: checks.recipientBinding.passed ? 'VERIFIED' : 'CONTRADICTED',
+        evidenceStatus: checks.recipientBinding.passed ? 'VERIFIED' : 'CONTRADICTED',
         sourceResponseSummary: { detail: checks.recipientBinding.detail }
       });
     }
@@ -191,7 +197,8 @@ class VerificationService {
         verificationId,
         evidenceType: 'AI_ANALYSIS',
         credentialIdentifier: input.credentialId || null,
-        evidenceStatus: checks.aiEvidence.passed ? 'CONFIRMED' : 'CONTRADICTED',
+        status: checks.aiEvidence.passed ? 'VERIFIED' : 'CONTRADICTED',
+        evidenceStatus: checks.aiEvidence.passed ? 'VERIFIED' : 'CONTRADICTED',
         sourceResponseSummary: input.aiData
       });
     }
@@ -202,7 +209,8 @@ class VerificationService {
         verificationId,
         evidenceType: 'OCR_EVIDENCE',
         credentialIdentifier: input.credentialId || null,
-        evidenceStatus: checks.ocrEvidence.passed ? 'CONFIRMED' : 'CONTRADICTED',
+        status: checks.ocrEvidence.passed ? 'VERIFIED' : 'CONTRADICTED',
+        evidenceStatus: checks.ocrEvidence.passed ? 'VERIFIED' : 'CONTRADICTED',
         sourceResponseSummary: input.ocrData
       });
     }
@@ -213,7 +221,8 @@ class VerificationService {
         verificationId,
         evidenceType: 'TIMESTAMP_EVIDENCE',
         credentialIdentifier: input.credentialId || null,
-        evidenceStatus: checks.timestampEvidence.passed ? 'CONFIRMED' : 'CONTRADICTED',
+        status: checks.timestampEvidence.passed ? 'VERIFIED' : 'CONTRADICTED',
+        evidenceStatus: checks.timestampEvidence.passed ? 'VERIFIED' : 'CONTRADICTED',
         sourceResponseSummary: { detail: checks.timestampEvidence.detail }
       });
     }

@@ -29,7 +29,8 @@ usr_example002,doc_example002,CERTIFICATION,AWS Cloud Practitioner,365
 usr_example003,doc_example003,EMPLOYMENT_VERIFICATION,Senior Software Engineer Acme Corp,730`;
 
 export default function IssueCredential({ initialParams = {}, onNavigate }) {
-  const { user } = useAuth();
+  const { user, role } = useAuth();
+  const initialIssuerId = initialParams?.issuerId || '';
   const [issuers, setIssuers] = useState([]);
   const [selectedIssuerId, setSelectedIssuerId] = useState("");
   const [recipientId, setRecipientId] = useState(initialParams.recipientId || "");
@@ -39,12 +40,59 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
   const [validityDays, setValidityDays] = useState(730);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [invalidFields, setInvalidFields] = useState({});
   const [issuedResult, setIssuedResult] = useState(null);
   const [recipientEmail, setRecipientEmail] = useState(initialParams.recipientEmail || "");
   const [lookupLoading, setLookupLoading] = useState(false);
   const [recipientData, setRecipientData] = useState(null);
   const [recipientDocs, setRecipientDocs] = useState([]);
   const [lookupSearched, setLookupSearched] = useState(false);
+  const [attachmentTab, setAttachmentTab] = useState('recipient');
+  const [uploadingArtifact, setUploadingArtifact] = useState(false);
+  const [attachmentToast, setAttachmentToast] = useState('');
+  const [artifactHash, setArtifactHash] = useState('');
+  const issuerDocumentRef = useRef(null);
+
+  function attachDocument(documentIdentifier, filename) {
+    if (!documentIdentifier) {
+      setError('This document does not have an artifact ID or SHA-256 hash to attach.');
+      return;
+    }
+    setDocumentId(documentIdentifier);
+    setInvalidFields((fields) => ({ ...fields, documentId: false }));
+    setError('');
+    setAttachmentToast(`Document ${filename || 'artifact'} Attached`);
+    window.setTimeout(() => setAttachmentToast(''), 3000);
+  }
+
+  async function handleIssuerDocumentUpload(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setError('');
+    setArtifactHash('');
+    setUploadingArtifact(true);
+    try {
+      if (!window.crypto?.subtle) throw new Error('Secure SHA-256 hashing is not available in this browser context.');
+      const digest = await window.crypto.subtle.digest('SHA-256', await file.arrayBuffer());
+      const hash = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+      setArtifactHash(hash);
+
+      const formData = new FormData();
+      formData.append('file', file);
+      const res = await api.artifacts.upload(formData);
+      const uploadedArtifact = res?.data?.document || res?.data?.artifact;
+      const uploadedId = uploadedArtifact?.documentId || uploadedArtifact?.artifactId;
+      if (!res?.success || !uploadedId) throw new Error(res?.error?.message || 'Artifact upload did not return a document ID.');
+
+      attachDocument(uploadedId, file.name);
+      setAttachmentTab('issuer');
+    } catch (err) {
+      setError(err.message || 'Issuer document upload failed.');
+    } finally {
+      setUploadingArtifact(false);
+      if (issuerDocumentRef.current) issuerDocumentRef.current.value = '';
+    }
+  }
 
   async function handleLookupRecipient(targetEmail) {
     const emailToLookup = targetEmail || recipientEmail;
@@ -60,6 +108,7 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
       if (res && res.success && res.data.found) {
         setRecipientData(res.data.recipient);
         setRecipientId(res.data.recipient.userId);
+        setInvalidFields((fields) => ({ ...fields, recipientEmail: false, recipientId: false }));
         setRecipientDocs(res.data.documents || []);
       } else {
         setRecipientData(null);
@@ -89,23 +138,70 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
       try {
         const res = await api.issuers.list({ limit: 100 });
         if (res && res.success) {
-          const list = res.data.issuers || [];
-          setIssuers(list);
-          const ui = list.find((i) => i.userId === user?.userId && i.status === "ACTIVE");
-          const active = ui || list.find((i) => i.status === "ACTIVE");
-          if (active) { setSelectedIssuerId(active.issuerId); setBulkIssuerId(active.issuerId); }
-          else if (list[0]) { setSelectedIssuerId(list[0].issuerId); setBulkIssuerId(list[0].issuerId); }
+          const activeProfiles = (res.data.issuers || []).filter((issuer) => issuer.status === 'ACTIVE');
+          let organizationIdentifiers = [user?.organizationId, user?.organization?.organizationId, user?.organization?.organizationCode]
+            .filter(Boolean).map(String);
+
+          if (user?.organizationId) {
+            try {
+              const orgRes = await api.organizations.list({ limit: 100 });
+              const organizations = orgRes?.data?.organizations || [];
+              const matchedOrganization = organizations.find((organization) => (
+                String(organization.id || organization._id) === String(user.organizationId) ||
+                String(organization.organizationId) === String(user.organizationId) ||
+                String(organization.organizationCode) === String(user.organizationId)
+              ));
+              if (matchedOrganization) {
+                organizationIdentifiers = organizationIdentifiers.concat([
+                  matchedOrganization.id || matchedOrganization._id,
+                  matchedOrganization.organizationId,
+                  matchedOrganization.organizationCode
+                ].filter(Boolean).map(String));
+              }
+            } catch {}
+          }
+
+          const scopedProfiles = role === 'ADMIN'
+            ? activeProfiles
+            : activeProfiles.filter((issuer) => (
+              String(issuer.userId) === String(user?.userId) ||
+              String(issuer.issuerId) === String(user?.issuerId) ||
+              organizationIdentifiers.includes(String(issuer.organizationId))
+            ));
+          // Prefer a profile associated with this user/organization, but keep demo
+          // sessions usable when that association is missing from the account data.
+          const availableProfiles = scopedProfiles.length ? scopedProfiles : activeProfiles;
+          setIssuers(availableProfiles);
+          const preferredIssuer = availableProfiles.find((issuer) => issuer.issuerId === initialIssuerId) ||
+            availableProfiles.find((issuer) => String(issuer.userId) === String(user?.userId)) ||
+            availableProfiles[0];
+          if (preferredIssuer) {
+            setSelectedIssuerId(preferredIssuer.issuerId);
+            setBulkIssuerId(preferredIssuer.issuerId);
+          } else {
+            setSelectedIssuerId('');
+            setBulkIssuerId('');
+          }
         }
       } catch {}
       try { const r = await api.users.list({ limit: 10 }); if (r?.success) setAvailableUsers(r.data.users || []); } catch {}
       try { const r = await api.documents.list({ limit: 5 }); if (r?.success) setAvailableDocs(r.data.documents || []); } catch {}
     }
     loadData();
-  }, []);
+  }, [user, role, initialIssuerId]);
 
   async function handleIssue(e) {
     e.preventDefault();
-    if (!selectedIssuerId || !recipientId || !documentId || !title) { setError("Please fill in all required fields."); return; }
+    const invalid = {
+      issuer: !selectedIssuerId.trim(),
+      recipientEmail: !recipientEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(recipientEmail.trim()),
+      recipientId: !recipientId.trim(),
+      documentId: !documentId.trim(),
+      title: !title.trim()
+    };
+    setInvalidFields(invalid);
+    if (Object.values(invalid).some(Boolean)) { setError("Please fill in all required fields."); return; }
+    setInvalidFields({});
     setError(""); setLoading(true); setIssuedResult(null);
     try {
       const vDays = Number(validityDays) || 365;
@@ -174,6 +270,11 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
 
   return (
     <div className="page-content">
+      {attachmentToast && (
+        <div role="status" className="glass-card" style={{ position: 'fixed', top: '1rem', right: '1rem', zIndex: 1200, padding: '0.8rem 1rem', border: '1px solid rgba(16, 185, 129, 0.4)', color: '#34d399', background: 'rgba(2, 6, 23, 0.96)' }}>
+          <CheckCircle2 size={15} style={{ verticalAlign: 'middle', marginRight: '0.5rem' }} />{attachmentToast}
+        </div>
+      )}
       <div className="page-header">
         <div>
           <h2>Issue Signed Workforce Credential</h2>
@@ -191,10 +292,11 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
             <h3>Credential Specifications</h3>
             <p className="text-secondary text-sm" style={{ marginBottom: "1.25rem" }}>Issuing requires an active issuer profile and an active Ed25519 cryptographic key pair.</p>
             {error && <div className="alert-banner danger" style={{ marginBottom: "1rem" }}><AlertCircle size={16} /><span>{error}</span></div>}
-            <form onSubmit={handleIssue}>
+            <form onSubmit={handleIssue} noValidate>
               <div className="form-group">
                 <label>Issuing Authority Profile</label>
-                <select className="select-input" value={selectedIssuerId} onChange={(e) => setSelectedIssuerId(e.target.value)} required>
+                <select className={`select-input ${invalidFields.issuer ? 'border-red-500' : ''}`} style={invalidFields.issuer ? { borderColor: '#ef4444' } : undefined} aria-invalid={!!invalidFields.issuer} value={selectedIssuerId} onChange={(e) => { setSelectedIssuerId(e.target.value); setInvalidFields((fields) => ({ ...fields, issuer: false })); }} disabled={!issuers.length}>
+                  {!issuers.length && <option value="">No active issuer profile for your account or organization</option>}
                   {issuers.map((i) => <option key={i.issuerId} value={i.issuerId}>{i.issuerCode} ({i.status}) - {i.issuerId}</option>)}
                 </select>
               </div>
@@ -204,12 +306,14 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
                 <label>Recipient Subject (Email Address)</label>
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                   <input 
-                    type="email" 
+                    type="email"
+                    className={invalidFields.recipientEmail ? 'border-red-500' : ''}
+                    style={invalidFields.recipientEmail ? { borderColor: '#ef4444' } : undefined}
+                    aria-invalid={!!invalidFields.recipientEmail}
                     placeholder="recipient@organization.edu" 
                     value={recipientEmail} 
-                    onChange={(e) => setRecipientEmail(e.target.value)} 
+                    onChange={(e) => { setRecipientEmail(e.target.value); setInvalidFields((fields) => ({ ...fields, recipientEmail: false })); }}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleLookupRecipient(); } }}
-                    required 
                   />
                   <button 
                     type="button" 
@@ -246,11 +350,13 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
               <div className="form-group">
                 <label>Recipient User ID</label>
                 <input 
-                  type="text" 
+                  type="text"
+                  className={invalidFields.recipientId ? 'border-red-500' : ''}
+                  style={invalidFields.recipientId ? { borderColor: '#ef4444' } : undefined}
+                  aria-invalid={!!invalidFields.recipientId}
                   placeholder="usr_0123456789abcdef" 
                   value={recipientId} 
-                  onChange={(e) => setRecipientId(e.target.value)} 
-                  required 
+                  onChange={(e) => { setRecipientId(e.target.value); setInvalidFields((fields) => ({ ...fields, recipientId: false })); }}
                 />
                 <span className="text-muted text-xs">Auto-populated from recipient email or entered manually.</span>
               </div>
@@ -259,34 +365,38 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
               <div className="form-group">
                 <label>Document Artifact to Attach</label>
                 <input 
-                  type="text" 
+                  type="text"
+                  className={invalidFields.documentId ? 'border-red-500' : ''}
+                  style={invalidFields.documentId ? { borderColor: '#ef4444' } : undefined}
+                  aria-invalid={!!invalidFields.documentId}
                   placeholder="doc_0123456789abcdef" 
                   value={documentId} 
-                  onChange={(e) => setDocumentId(e.target.value)} 
-                  required 
+                  onChange={(e) => { setDocumentId(e.target.value); setInvalidFields((fields) => ({ ...fields, documentId: false })); }}
                 />
+                <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.65rem', flexWrap: 'wrap' }}>
+                  <button type="button" className={`action-btn ${attachmentTab === 'recipient' ? 'primary' : 'secondary'} text-xs`} onClick={() => setAttachmentTab('recipient')}>
+                    Recipient Uploads ({recipientDocs.length})
+                  </button>
+                  <button type="button" className={`action-btn ${attachmentTab === 'issuer' ? 'primary' : 'secondary'} text-xs`} onClick={() => setAttachmentTab('issuer')}>
+                    Upload Issuer Document
+                  </button>
+                </div>
 
-                {recipientDocs.length > 0 && (
-                  <div style={{ marginTop: '0.6rem' }}>
-                    <span className="text-muted text-xs" style={{ fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
-                      Recipient's Uploaded Documents ({recipientDocs.length}):
-                    </span>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '180px', overflowY: 'auto' }}>
+                {attachmentTab === 'recipient' ? (
+                  recipientDocs.length > 0 ? (
+                    <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: '180px', overflowY: 'auto' }}>
                       {recipientDocs.map((doc) => {
-                        const isSelected = documentId === doc.documentId;
+                        const docIdentifier = doc.documentId || doc.sha256Hash;
+                        const isSelected = documentId === doc.documentId || documentId === doc.sha256Hash;
                         return (
-                          <div 
-                            key={doc.documentId}
-                            onClick={() => setDocumentId(doc.documentId)}
+                          <div
+                            key={doc.documentId || doc.sha256Hash}
                             style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '0.45rem 0.6rem',
-                              borderRadius: 'var(--radius-sm)',
-                              border: isSelected ? '1px solid var(--accent-cyan)' : '1px solid var(--border-subtle)',
-                              background: isSelected ? 'rgba(0, 240, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
-                              cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              padding: '0.45rem 0.6rem', borderRadius: 'var(--radius-sm)',
+                              border: isSelected ? '1px solid rgba(16, 185, 129, 0.75)' : '1px solid var(--border-subtle)',
+                              boxShadow: isSelected ? '0 0 0 1px rgba(16, 185, 129, 0.18)' : 'none',
+                              background: isSelected ? 'rgba(16, 185, 129, 0.08)' : 'rgba(255, 255, 255, 0.02)',
                               fontSize: '0.78rem'
                             }}
                           >
@@ -295,22 +405,37 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
                               <span className="text-muted text-xs" style={{ marginLeft: '0.5rem' }}>
                                 ({doc.mimeType?.split('/')[1] || 'doc'}, {(doc.fileSize / 1024).toFixed(1)} KB) · {new Date(doc.createdAt).toLocaleDateString()}
                               </span>
-                              <div className="code-snippet hash-text text-xs" style={{ marginTop: '2px' }}>
-                                SHA256: {doc.sha256Hash?.slice(0, 20)}...
-                              </div>
+                              <div className="code-snippet hash-text text-xs" style={{ marginTop: '2px' }}>SHA256: {doc.sha256Hash?.slice(0, 20)}...</div>
                             </div>
                             <button
                               type="button"
                               className={`action-btn ${isSelected ? 'primary' : 'secondary'} text-xs`}
                               style={{ padding: '2px 8px', fontSize: '0.7rem', flexShrink: 0 }}
-                              onClick={(e) => { e.stopPropagation(); setDocumentId(doc.documentId); }}
+                              onClick={() => attachDocument(docIdentifier, doc.originalFilename)}
                             >
-                              {isSelected ? 'Selected' : 'Attach'}
+                              {isSelected ? 'Attached' : 'Attach'}
                             </button>
                           </div>
                         );
                       })}
                     </div>
+                  ) : (
+                    <p className="text-muted text-xs" style={{ marginTop: '0.55rem' }}>Find a recipient to browse their uploaded documents, or upload an issuer document.</p>
+                  )
+                ) : (
+                  <div style={{ marginTop: '0.65rem' }}>
+                    <label htmlFor="issuer-document-upload" className="text-muted text-xs" style={{ display: 'block', marginBottom: '0.35rem' }}>Upload a PDF or image artifact</label>
+                    <input
+                      id="issuer-document-upload"
+                      ref={issuerDocumentRef}
+                      type="file"
+                      accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                      onChange={handleIssuerDocumentUpload}
+                      disabled={uploadingArtifact}
+                      style={{ display: 'block', width: '100%' }}
+                    />
+                    {uploadingArtifact && <span className="text-cyan text-xs" style={{ display: 'block', marginTop: '0.4rem' }}>Hashing and uploading artifact…</span>}
+                    {artifactHash && <span className="code-snippet hash-text text-xs" style={{ display: 'block', marginTop: '0.4rem' }}>SHA-256: {artifactHash}</span>}
                   </div>
                 )}
                 <span className="text-muted text-xs" style={{ marginTop: '0.3rem', display: 'block' }}>
@@ -332,7 +457,7 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
               </div>
               <div className="form-group">
                 <label>Credential Title / Award Designation</label>
-                <input type="text" placeholder="e.g. Master of Science in Cybersecurity" value={title} onChange={(e) => setTitle(e.target.value)} required />
+                <input type="text" placeholder="e.g. Master of Science in Cybersecurity" className={invalidFields.title ? 'border-red-500' : ''} style={invalidFields.title ? { borderColor: '#ef4444' } : undefined} aria-invalid={!!invalidFields.title} value={title} onChange={(e) => { setTitle(e.target.value); setInvalidFields((fields) => ({ ...fields, title: false })); }} />
               </div>
               <button type="submit" className="action-btn primary full-width" disabled={loading}>
                 <Award size={16} />{loading ? "Generating Canonical Signature..." : "Issue & Sign Credential"}
@@ -353,7 +478,7 @@ export default function IssueCredential({ initialParams = {}, onNavigate }) {
                   <div className="json-code-box"><pre>{JSON.stringify(issuedResult.version.signedPayload, null, 2)}</pre></div>
                 </div>
                 <div style={{ marginTop: "1.5rem", display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-                  <button className="action-btn primary text-xs" onClick={() => onNavigate("credential_list", { credentialId: issuedResult.credential.credentialId })}><Award size={14} /> View in Registry</button>
+                  <button className="action-btn primary text-xs" onClick={() => onNavigate(`/credentials/all?highlight=${encodeURIComponent(issuedResult.credential.credentialId)}`)}><Award size={14} /> View in Registry</button>
                   <button className="action-btn secondary text-xs" onClick={() => onNavigate(`/verify/${issuedResult.credential.credentialId}`, { credentialId: issuedResult.credential.credentialId })}><ShieldCheck size={14} /> Verify Credential</button>
                   <button className="action-btn secondary text-xs" onClick={() => { setIssuedResult(null); setTitle(""); }}>Issue Another</button>
                 </div>

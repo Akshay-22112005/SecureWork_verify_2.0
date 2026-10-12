@@ -64,7 +64,7 @@ export default function VerificationHistory({ initialParams = {}, onNavigate }) 
   });
 
   return (
-    <div className="page-content">
+    <div className="page-content verification-history-page">
       {/* Workflow Navigation Banner */}
       <div className="glass-card" style={{ padding: '0.75rem 1.25rem', marginBottom: '1.25rem', background: 'rgba(255, 255, 255, 0.03)', border: '1px solid rgba(0, 240, 255, 0.15)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', fontSize: '0.8rem' }}>
@@ -257,9 +257,11 @@ export default function VerificationHistory({ initialParams = {}, onNavigate }) 
                   </button>
                   <button 
                     className="action-btn primary text-xs"
+                    disabled={!selectedVerification.credentialId && !selectedVerification.credentialHash && !selectedVerification.verificationId}
                     onClick={() => {
-                      const cId = selectedVerification.credentialId;
+                      const cId = selectedVerification.credentialId || selectedVerification.credentialHash || selectedVerification.verificationId;
                       const dHash = selectedVerification.documentHash;
+                      if (!cId) return;
                       setSelectedVerification(null);
                       onNavigate('verify_document', { credentialId: cId, documentHash: dHash });
                     }}

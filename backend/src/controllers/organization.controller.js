@@ -2,6 +2,9 @@ const crypto = require('crypto');
 const organizationService = require('../services/organization.service');
 const Organization = require('../models/organization.model');
 const User = require('../models/user.model');
+const Issuer = require('../models/issuer.model');
+const issuerService = require('../services/issuer.service');
+const issuerKeyService = require('../services/issuerKey.service');
 const TrustedSource = require('../models/trustedSource.model');
 const emailService = require('../services/email.service');
 const auditService = require('../services/audit.service');
@@ -324,6 +327,87 @@ async function verifyOrganizationTrustedSource(req, res, next) {
   }
 }
 
+async function findOrganizationIssuer(organization, identifier) {
+  const clauses = [{ issuerId: identifier }, { issuerCode: String(identifier).toUpperCase() }];
+  if (/^[0-9a-fA-F]{24}$/.test(identifier)) clauses.push({ _id: identifier });
+  const issuer = await Issuer.findOne({ $or: clauses });
+  const organizationIdentifiers = [organization.organizationId, organization.organizationCode, String(organization._id)];
+  if (!issuer || !organizationIdentifiers.includes(String(issuer.organizationId))) {
+    throw new NotFoundError('Issuer not found for this organization', 'ISSUER_NOT_FOUND');
+  }
+  return issuer;
+}
+
+async function registerOrganizationIssuer(req, res, next) {
+  try {
+    const organization = await findOrganization(req.params.id);
+    const userId = String(req.body?.userId || '').trim();
+    if (!userId) throw new ValidationError('A verified user ID is required to register an issuer');
+
+    const registeredIssuer = await issuerService.registerIssuer({
+      organizationId: organization.organizationId,
+      userId,
+      issuerCode: req.body?.issuerCode,
+      authorizationEvidence: req.body?.authorizationEvidence
+    }, req.user);
+
+    await issuerService.approveIssuer(registeredIssuer.issuerId, {}, req.user);
+    const key = await issuerKeyService.generateKeyForIssuer(registeredIssuer.issuerId, req.user);
+    const issuer = await Issuer.findOne({ issuerId: registeredIssuer.issuerId });
+    issuer.publicKeyId = key.keyId;
+    await issuer.save();
+
+    await auditService.appendLog({
+      action: 'ISSUER_ACCREDITED',
+      performedBy: req.user.userId,
+      targetType: 'ISSUER',
+      targetId: issuer.issuerId,
+      metadata: {
+        organizationId: organization.organizationId,
+        userId,
+        publicKeyId: key.keyId
+      }
+    });
+
+    return successResponse(res, { issuer: issuer.toJSON(), key }, 201);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function approveOrganizationIssuer(req, res, next) {
+  try {
+    const organization = await findOrganization(req.params.id);
+    const issuer = await findOrganizationIssuer(organization, req.params.issuerId);
+    const result = await issuerService.approveIssuer(issuer.issuerId, req.body || {}, req.user);
+    return successResponse(res, { issuer: result }, 200);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function suspendOrganizationIssuer(req, res, next) {
+  try {
+    const organization = await findOrganization(req.params.id);
+    const issuer = await findOrganizationIssuer(organization, req.params.issuerId);
+    const result = await issuerService.suspendIssuer(issuer.issuerId, req.body || {}, req.user);
+    return successResponse(res, { issuer: result }, 200);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function revokeOrganizationIssuer(req, res, next) {
+  try {
+    const organization = await findOrganization(req.params.id);
+    const issuer = await findOrganizationIssuer(organization, req.params.issuerId);
+    const result = await issuerService.revokeIssuer(issuer.issuerId, req.body || {}, req.user);
+    return successResponse(res, { issuer: result }, 200);
+  } catch (err) {
+    next(err);
+  }
+}
+
 /** Invite a single unregistered email and pre-bind it to the organization. */
 async function inviteUserToOrganization(req, res, next) {
   try {
@@ -478,5 +562,9 @@ module.exports = {
   resendUserInvitation,
   createOrganizationTrustedSource,
   verifyOrganizationTrustedSource,
+  approveOrganizationIssuer,
+  registerOrganizationIssuer,
+  suspendOrganizationIssuer,
+  revokeOrganizationIssuer,
   inviteUserToOrganization
 };

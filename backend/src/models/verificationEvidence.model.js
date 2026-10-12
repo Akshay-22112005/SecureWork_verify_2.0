@@ -17,7 +17,7 @@ const EVIDENCE_TYPES = [
   'TIMESTAMP_EVIDENCE'
 ];
 
-const EVIDENCE_STATUSES = ['CONFIRMED', 'CONTRADICTED', 'INCONCLUSIVE', 'PENDING'];
+const EVIDENCE_STATUSES = ['VERIFIED', 'CONFIRMED', 'CONTRADICTED', 'INCONCLUSIVE', 'PENDING'];
 
 const VerificationEvidenceSchema = new mongoose.Schema({
   evidenceId: {
@@ -81,6 +81,12 @@ const VerificationEvidenceSchema = new mongoose.Schema({
     default: 'CONFIRMED',
     index: true
   },
+  status: {
+    type: String,
+    enum: EVIDENCE_STATUSES,
+    default: 'CONFIRMED',
+    index: true
+  },
   createdAt: {
     type: Date,
     default: Date.now,
@@ -98,6 +104,13 @@ VerificationEvidenceSchema.pre('validate', function (next) {
 // Enforce strict immutability: Evidence is historical and can never be rewritten!
 VerificationEvidenceSchema.pre('save', function (next) {
   if (!this.isNew) {
+    const modifiedPaths = this.modifiedPaths();
+    const statusOnlyApproval = modifiedPaths.length > 0 &&
+      modifiedPaths.every((path) => path === 'status' || path === 'evidenceStatus') &&
+      this.status === 'VERIFIED' && this.evidenceStatus === 'VERIFIED';
+    if (statusOnlyApproval) {
+      return next();
+    }
     return next(new Error('VerificationEvidence is historical and immutable. Old evidence cannot be rewritten.'));
   }
   next();

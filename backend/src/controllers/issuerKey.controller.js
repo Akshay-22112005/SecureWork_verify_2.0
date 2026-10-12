@@ -30,7 +30,8 @@ async function getKeyById(req, res, next) {
  */
 async function rotateIssuerKey(req, res, next) {
   try {
-    const key = await issuerKeyService.rotateIssuerKey(req.params.id, req.user);
+    const issuerId = req.params.id || req.body?.issuerId || req.body?.organizationId;
+    const key = await issuerKeyService.rotateIssuerKey(issuerId, req.user);
     return successResponse(res, { key }, 200);
   } catch (err) {
     next(err);
@@ -42,8 +43,9 @@ async function rotateIssuerKey(req, res, next) {
  */
 async function generateKey(req, res, next) {
   try {
-    const key = await issuerKeyService.generateKeyForIssuer(req.params.id, req.user);
-    return successResponse(res, { key }, 201);
+    const issuerId = req.params.id || req.body?.issuerId || req.body?.organizationId;
+    const key = await issuerKeyService.generateKeyForIssuer(issuerId, req.user);
+    return successResponse(res, { key }, 200);
   } catch (err) {
     next(err);
   }

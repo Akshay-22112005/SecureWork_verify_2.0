@@ -29,7 +29,6 @@ import VerifyOfficialSource from './pages/VerifyOfficialSource';
 import AdminUsers from './pages/AdminUsers';
 import AdminOrganizations from './pages/AdminOrganizations';
 import AdminOrganizationDetail from './pages/AdminOrganizationDetail';
-import AdminIssuers from './pages/AdminIssuers';
 import AdminSystemSettings from './pages/AdminSystemSettings';
 import AuditLogs from './pages/AuditLogs';
 import VerificationEvidence from './pages/VerificationEvidence';
@@ -44,8 +43,9 @@ function PageWrapper({ Component, ...rest }) {
     if (typeof pageIdOrPath === 'string') {
       if (pageIdOrPath.startsWith('/')) {
         navigate(pageIdOrPath, { state: params });
-      } else if (pageIdOrPath === 'verify_document' && params?.credentialId) {
-        navigate(`/verify/${params.credentialId}`, { state: params });
+      } else if (pageIdOrPath === 'verify_document' && (params?.credentialId || params?.credentialHash || params?.verificationId)) {
+        const credentialIdentifier = params.credentialId || params.credentialHash || params.verificationId;
+        navigate(`/verify/${encodeURIComponent(credentialIdentifier)}`, { state: { ...params, credentialId: credentialIdentifier } });
       } else {
         const pathMap = {
           dashboard: '/dashboard',
@@ -63,7 +63,6 @@ function PageWrapper({ Component, ...rest }) {
           verify_source: '/trusted-sources/verify',
           admin_users: '/admin/users',
           admin_organizations: '/admin/organizations',
-          admin_issuers: '/admin/issuers',
           admin_settings: '/admin/settings',
           audit_logs: '/audit/logs',
           verification_evidence: '/audit/evidence',
@@ -151,7 +150,7 @@ export function AppRoutes() {
         <Route
           path="/history"
           element={
-            <RoleRoute allowedRoles={['ADMIN', 'USER', 'HR', 'MEMBER']}>
+            <RoleRoute allowedRoles={['ADMIN', 'USER', 'HR', 'MEMBER', 'AUDITOR']}>
               <PageWrapper Component={VerificationHistory} />
             </RoleRoute>
           }
@@ -274,11 +273,7 @@ export function AppRoutes() {
         />
         <Route
           path="/admin/issuers"
-          element={
-            <RoleRoute allowedRoles={['ADMIN']}>
-              <PageWrapper Component={AdminIssuers} />
-            </RoleRoute>
-          }
+          element={<Navigate to="/admin/organizations" replace />}
         />
         <Route
           path="/admin/settings"
@@ -302,7 +297,9 @@ export default function App() {
       <AuthProvider>
         <NotificationProvider>
           <BrowserRouter>
-            <AppRoutes />
+            <ErrorBoundary>
+              <AppRoutes />
+            </ErrorBoundary>
           </BrowserRouter>
         </NotificationProvider>
       </AuthProvider>

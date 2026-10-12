@@ -1,10 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Award, Eye, Trash2, RefreshCw, X, AlertTriangle, ShieldCheck, CheckCircle2, History, GitBranch, Key, Calendar } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Award, Eye, Trash2, RefreshCw, X, AlertTriangle, ShieldCheck, CheckCircle2, History, GitBranch, Key, Calendar, Search } from 'lucide-react';
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 
 export default function CredentialList({ initialParams = {}, onNavigate }) {
+  const [searchParams] = useSearchParams();
+  const urlSearch = searchParams.get('highlight') || searchParams.get('search') || '';
+  const [search, setSearch] = useState(urlSearch);
+  const highlightedCredentialId = urlSearch || initialParams.credentialId || '';
   const [credentials, setCredentials] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedCred, setSelectedCred] = useState(null);
@@ -16,6 +21,17 @@ export default function CredentialList({ initialParams = {}, onNavigate }) {
   const [revoking, setRevoking] = useState(false);
   const [actionSuccess, setActionSuccess] = useState('');
   const modalContainerRef = useRef(null);
+
+  useEffect(() => {
+    setSearch(urlSearch);
+  }, [urlSearch]);
+
+  const visibleCredentials = credentials.filter((credential) => {
+    const term = search.trim().toLowerCase();
+    if (!term) return true;
+    return [credential.credentialId, credential.credentialType, credential.title, credential.recipientId]
+      .some((value) => String(value || '').toLowerCase().includes(term));
+  });
 
   async function openCredentialDetail(cred) {
     setSelectedCred(cred);
@@ -157,12 +173,23 @@ export default function CredentialList({ initialParams = {}, onNavigate }) {
       )}
 
       <div className="glass-card table-container">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '1rem', maxWidth: '440px' }}>
+          <Search size={16} className="text-muted" />
+          <input
+            type="search"
+            aria-label="Search issued credentials"
+            placeholder="Search by credential ID, title, recipient, or type"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            style={{ width: '100%' }}
+          />
+        </div>
         {loading ? (
           <div className="empty-state">Loading registry...</div>
-        ) : credentials.length === 0 ? (
+        ) : visibleCredentials.length === 0 ? (
           <div className="empty-state">
             <Award size={36} style={{ opacity: 0.3, marginBottom: '0.75rem' }} />
-            <p>No credentials found in registry.</p>
+            <p>{credentials.length ? 'No credentials match your search.' : 'No credentials found in registry.'}</p>
           </div>
         ) : (
           <table className="data-table">
@@ -178,11 +205,14 @@ export default function CredentialList({ initialParams = {}, onNavigate }) {
               </tr>
             </thead>
             <tbody>
-              {credentials.map((c) => (
+              {visibleCredentials.map((c) => {
+                const isHighlighted = highlightedCredentialId && c.credentialId === highlightedCredentialId;
+                return (
                 <tr 
                   key={c.credentialId}
+                  className={isHighlighted ? 'bg-emerald-500/10 border-emerald-500/30' : ''}
                   onClick={() => openCredentialDetail(c)}
-                  style={{ cursor: 'pointer' }}
+                  style={{ cursor: 'pointer', background: isHighlighted ? 'rgba(16, 185, 129, 0.10)' : undefined, boxShadow: isHighlighted ? 'inset 0 0 0 1px rgba(16, 185, 129, 0.3)' : undefined }}
                   title="Click to view full credential details & version history"
                 >
                   <td className="code-snippet" style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>{c.credentialId}</td>
@@ -233,7 +263,8 @@ export default function CredentialList({ initialParams = {}, onNavigate }) {
                     </div>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         )}

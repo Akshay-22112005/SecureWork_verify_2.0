@@ -15,5 +15,9 @@ router.post('/organizations/:id/users/bulk-csv', upload.single('file'), organiza
 router.post('/organizations/:id/users/:userId/resend-invite', organizationController.resendUserInvitation);
 router.post('/organizations/:id/sources', organizationController.createOrganizationTrustedSource);
 router.patch('/organizations/:id/sources/:sourceId/verify', organizationController.verifyOrganizationTrustedSource);
+router.post('/organizations/:id/issuers', organizationController.registerOrganizationIssuer);
+router.patch('/organizations/:id/issuers/:issuerId/approve', organizationController.approveOrganizationIssuer);
+router.patch('/organizations/:id/issuers/:issuerId/suspend', organizationController.suspendOrganizationIssuer);
+router.delete('/organizations/:id/issuers/:issuerId', organizationController.revokeOrganizationIssuer);
 
 module.exports = router;

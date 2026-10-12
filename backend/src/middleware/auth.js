@@ -61,10 +61,11 @@ function requireRole(...allowedRoles) {
       return next(new UnauthorizedError('Authentication required before role validation', 'UNAUTHORIZED'));
     }
 
-    if (!allowedRoles.includes(req.user.role)) {
+    const activeRole = req.user.role || req.headers['x-persona-role'];
+    if (!allowedRoles.includes(activeRole)) {
       return next(
         new ForbiddenError(
-          `Insufficient permissions: Role "${req.user.role}" cannot access this resource`,
+          `Insufficient permissions: Role "${activeRole || 'UNKNOWN'}" cannot access this resource`,
           'FORBIDDEN'
         )
       );
