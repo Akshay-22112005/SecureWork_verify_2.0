@@ -20,7 +20,8 @@ export default function RoleRoute({ allowedRoles, children }) {
     }
     return (
       <AccessDenied 
-        requiredRole={allowedRoles.join(' / ')} 
+        targetPage={location.pathname}
+        requiredRoles={allowedRoles} 
         currentRole={role} 
       />
     );
@@ -35,7 +36,8 @@ export default function RoleRoute({ allowedRoles, children }) {
   const configuredRoles = ROUTE_PERMISSIONS[currentPath] || [];
   return (
     <AccessDenied 
-      requiredRole={configuredRoles.length > 0 ? configuredRoles.join(' / ') : 'Restricted'} 
+      targetPage={currentPath}
+      requiredRoles={configuredRoles} 
       currentRole={role} 
     />
   );

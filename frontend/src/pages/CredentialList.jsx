@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Award, Eye, Trash2, RefreshCw, X, AlertTriangle, ShieldCheck, CheckCircle2, History, GitBranch, Key, Calendar } from 'lucide-react';
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
@@ -14,9 +15,11 @@ export default function CredentialList({ initialParams = {}, onNavigate }) {
   const [revocationReason, setRevocationReason] = useState('');
   const [revoking, setRevoking] = useState(false);
   const [actionSuccess, setActionSuccess] = useState('');
+  const modalContainerRef = useRef(null);
 
   async function openCredentialDetail(cred) {
     setSelectedCred(cred);
+    window.scrollTo(0, 0);
     setCredVersions([]);
     setCredTimeline([]);
     setLoadingDetails(true);
@@ -78,6 +81,35 @@ export default function CredentialList({ initialParams = {}, onNavigate }) {
   useEffect(() => {
     loadCredentials();
   }, [initialParams.credentialId]);
+
+  // Lock background scroll and reset scroll positions when modal opens
+  useEffect(() => {
+    if (selectedCred) {
+      window.scrollTo(0, 0);
+      if (modalContainerRef.current) {
+        modalContainerRef.current.scrollTop = 0;
+      }
+      const prevOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = prevOverflow;
+      };
+    }
+  }, [selectedCred]);
+
+  // Support Esc key to dismiss any active modal
+  useEffect(() => {
+    function handleKeyDown(e) {
+      if (e.key === 'Escape') {
+        setSelectedCred(null);
+        setRevokeTarget(null);
+      }
+    }
+    if (selectedCred || revokeTarget) {
+      window.addEventListener('keydown', handleKeyDown);
+      return () => window.removeEventListener('keydown', handleKeyDown);
+    }
+  }, [selectedCred, revokeTarget]);
 
   async function handleRevokeSubmit(e) {
     e.preventDefault();
@@ -175,7 +207,7 @@ export default function CredentialList({ initialParams = {}, onNavigate }) {
                         className="action-btn primary text-xs"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onNavigate('verify_document', { 
+                          onNavigate(`/verify/${c.credentialId}`, { 
                             credentialId: c.credentialId,
                             documentHash: c.documentHash,
                             documentId: c.documentId 
@@ -207,10 +239,38 @@ export default function CredentialList({ initialParams = {}, onNavigate }) {
         )}
       </div>
 
-      {/* Credential Detail Modal with Versions & Timeline */}
-      {selectedCred && (
-        <div className="modal-overlay" onClick={() => setSelectedCred(null)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '850px', maxHeight: '90vh', overflowY: 'auto' }}>
+      {/* Credential Detail Modal with Versions & Timeline rendered into document.body */}
+      {selectedCred && createPortal(
+        <div 
+          className="modal-overlay modal-portal-overlay" 
+          onClick={() => setSelectedCred(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            overflowY: 'auto',
+            padding: '1.75rem 1rem 2rem 1rem',
+            background: 'rgba(10, 15, 29, 0.78)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)'
+          }}
+        >
+          <div 
+            ref={modalContainerRef}
+            className="modal-container" 
+            onClick={(e) => e.stopPropagation()} 
+            style={{ 
+              width: '100%',
+              maxWidth: '850px', 
+              maxHeight: 'calc(100vh - 4rem)', 
+              overflowY: 'auto',
+              margin: '0 auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)'
+            }}
+          >
             <div className="modal-header">
               <div>
                 <h3>{selectedCred.title}</h3>
@@ -319,7 +379,7 @@ export default function CredentialList({ initialParams = {}, onNavigate }) {
                     const dHash = selectedCred.documentHash;
                     const dId = selectedCred.documentId;
                     setSelectedCred(null);
-                    onNavigate('verify_document', { credentialId: cid, documentHash: dHash, documentId: dId });
+                    onNavigate(`/verify/${cid}`, { credentialId: cid, documentHash: dHash, documentId: dId });
                   }}
                 >
                   <ShieldCheck size={14} /> Verify Credential
@@ -327,13 +387,39 @@ export default function CredentialList({ initialParams = {}, onNavigate }) {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {/* Revocation Confirmation Modal */}
-      {revokeTarget && (
-        <div className="modal-overlay" onClick={() => setRevokeTarget(null)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+      {/* Revocation Confirmation Modal rendered into document.body */}
+      {revokeTarget && createPortal(
+        <div 
+          className="modal-overlay modal-portal-overlay" 
+          onClick={() => setRevokeTarget(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 9999,
+            display: 'flex',
+            alignItems: 'flex-start',
+            justifyContent: 'center',
+            overflowY: 'auto',
+            padding: '3rem 1rem 2rem 1rem',
+            background: 'rgba(10, 15, 29, 0.78)',
+            backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)'
+          }}
+        >
+          <div 
+            className="modal-container" 
+            onClick={(e) => e.stopPropagation()} 
+            style={{ 
+              width: '100%',
+              maxWidth: '500px',
+              margin: '0 auto',
+              boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1)'
+            }}
+          >
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <AlertTriangle size={20} className="text-danger" />
@@ -369,7 +455,8 @@ export default function CredentialList({ initialParams = {}, onNavigate }) {
               </form>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
