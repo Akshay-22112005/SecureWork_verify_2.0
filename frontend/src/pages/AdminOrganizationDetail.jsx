@@ -520,7 +520,7 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
                     <td>{issuer.createdAt ? new Date(issuer.createdAt).toLocaleDateString() : 'N/A'}</td>
                     <td>
                       <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        {issuer.status !== 'APPROVED' && issuer.status !== 'REVOKED' && (
+                        {issuer.status === 'PENDING' && (
                           <button
                             className="action-btn primary text-xs"
                             onClick={() => handleApproveIssuer(issuer.issuerId)}
@@ -528,6 +528,9 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
                           >
                             Approve
                           </button>
+                        )}
+                        {(issuer.status === 'ACTIVE' || issuer.status === 'APPROVED') && (
+                          <span className="text-xs text-emerald-400 font-medium">Active</span>
                         )}
                         {issuer.status === 'APPROVED' && (
                           <button
