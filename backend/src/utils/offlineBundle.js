@@ -1,41 +1,56 @@
 const { canonicalizeJson, sha256 } = require('./crypto');
-const { buildCredentialSigningPayload } = require('./credentialPayload');
 
 /**
  * Build a self-contained offline verification bundle.
  * Contains the RFC 8785 canonicalized credential payload, cryptographic signature,
  * public key PEM, and audit-chain proof.
  */
-function buildOfflineBundle({ credential, issuer, organization, recipient, activeKey, auditEntry }) {
-  const canonicalPayload = buildCredentialSigningPayload(credential);
+function buildOfflineBundle({ credential, activeVersion, issuer, organization, recipient, activeKey, auditEntry, documentRecord, documentBase64 }) {
+  const canonicalPayload = activeVersion?.signedPayload || {
+    credentialId: credential?.credentialId || '',
+    documentHash: activeVersion?.documentHash || '',
+    organizationId: credential?.organizationId || '',
+    issuerId: credential?.issuerId || '',
+    recipientId: credential?.recipientId || '',
+    credentialType: credential?.credentialType || '',
+    issuedAt: credential?.issuedAt || null,
+    expiresAt: credential?.expiresAt || null
+  };
 
   return {
     bundleVersion: '1.0.0',
     generatedAt: new Date().toISOString(),
     standard: 'SecureWork Verify Offline Verification Bundle (RFC 8785 + Ed25519)',
     credential: {
-      credentialId: credential.credentialId,
-      title: credential.title,
-      credentialType: credential.credentialType,
-      status: credential.status,
-      issuedAt: credential.issuedAt,
-      expiresAt: credential.expiresAt,
-      documentHash: credential.documentHash,
-      hashAlgorithm: credential.hashAlgorithm || 'SHA-256',
+      credentialId: credential?.credentialId || null,
+      title: credential?.title || 'Workforce Credential',
+      credentialType: credential?.credentialType || null,
+      status: credential?.status || 'UNKNOWN',
+      issuedAt: credential?.issuedAt || null,
+      expiresAt: credential?.expiresAt || null,
+      documentHash: activeVersion?.documentHash || '',
+      hashAlgorithm: documentRecord?.hashAlgorithm || 'SHA-256',
       recipientName: recipient?.name || 'Authorized Recipient',
-      canonicalSigningPayload: canonicalPayload
+      canonicalSigningPayload: canonicalPayload,
+      document: documentRecord ? {
+        documentId: documentRecord.documentId || null,
+        originalFilename: documentRecord.originalFilename || null,
+        mimeType: documentRecord.mimeType || null,
+        sha256Hash: documentRecord.sha256Hash || activeVersion?.documentHash || null,
+        contentBase64: documentBase64 || null
+      } : null
     },
     signature: {
-      algorithm: credential.signatureAlgorithm || 'Ed25519',
-      valueHex: credential.signature,
-      keyId: credential.issuerKeyId
+      algorithm: activeVersion?.signatureAlgorithm || credential?.signatureAlgorithm || 'Ed25519',
+      valueHex: activeVersion?.signature || credential?.signature || null,
+      keyId: activeVersion?.issuerKeyId || credential?.issuerKeyId || null
     },
     issuer: {
-      issuerId: credential.issuerId,
+      issuerId: credential?.issuerId || null,
       issuerCode: issuer?.issuerCode,
       organizationName: organization?.name || 'Accredited Institution',
       officialDomain: organization?.officialDomain,
-      publicKeyPem: activeKey?.publicKeyPem
+      publicKeyPem: activeKey?.publicKey || null
     },
     auditProof: {
       sequenceNumber: auditEntry?.sequenceNumber || null,

@@ -313,6 +313,8 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
     }
   }
 
+  const downloadsDisabled = publicData?.status === 'NOT_FOUND' || publicData?.verified === false;
+
   return (
     <div className="page-content public-verify-page">
       <div className="public-verify-container">
@@ -446,6 +448,14 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: '1rem' }}>
                   {hrCredentials.map((cred) => {
                     const isSelected = hrSelectedCred?.credentialId === cred.credentialId;
+                    const keyStatus = String(cred.keyStatus || cred.issuerKey?.status || (cred.digitalSignatureValid ? 'ACTIVE' : 'UNKNOWN')).toUpperCase();
+                    const keyStatusStyle = keyStatus === 'ACTIVE'
+                      ? { color: '#10b981', borderColor: 'rgba(16,185,129,.4)', background: 'rgba(16,185,129,.1)' }
+                      : keyStatus === 'REVOKED'
+                        ? { color: '#ef4444', borderColor: 'rgba(239,68,68,.4)', background: 'rgba(239,68,68,.1)' }
+                        : keyStatus === 'EXPIRED'
+                          ? { color: '#f59e0b', borderColor: 'rgba(245,158,11,.4)', background: 'rgba(245,158,11,.1)' }
+                          : { color: 'var(--text-muted)' };
                     return (
                       <div 
                         key={cred.credentialId}
@@ -497,7 +507,9 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
 
                           <div className="detail-row" style={{ padding: '0.25rem 0' }}>
                             <span className="detail-label" style={{ fontSize: '0.75rem' }}>Key Status</span>
-                            <span className="badge-tag" style={{ fontSize: '0.7rem' }}>{cred.keyStatus}</span>
+                            <span className="badge-tag" style={{ fontSize: '0.7rem', ...keyStatusStyle }}>
+                              {keyStatus === 'ACTIVE' ? 'VERIFIED / ACTIVE' : keyStatus}
+                            </span>
                           </div>
 
                           <div className="detail-row" style={{ padding: '0.25rem 0' }}>
@@ -722,21 +734,32 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
               </div>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {downloadsDisabled && (
+                  <div role="status" className="alert-banner danger" style={{ maxWidth: '280px', fontSize: '0.75rem' }}>
+                    Cryptographic bundles are generated for registered credentials. This uploaded file is an unregistered document.
+                  </div>
+                )}
                 <a 
-                  href={`/api/public/pdf/${publicData?.credentialId || credentialId}`} 
-                  target="_blank" 
+                  href={downloadsDisabled ? undefined : `/api/public/pdf/${publicData?.credentialId || credentialId}`}
+                  target={downloadsDisabled ? undefined : '_blank'}
                   rel="noreferrer"
+                  aria-disabled={downloadsDisabled}
+                  tabIndex={downloadsDisabled ? -1 : 0}
+                  onClick={downloadsDisabled ? (event) => event.preventDefault() : undefined}
                   className="action-btn primary text-xs" 
-                  style={{ textDecoration: 'none' }}
+                  style={{ textDecoration: 'none', opacity: downloadsDisabled ? 0.5 : 1, cursor: downloadsDisabled ? 'not-allowed' : 'pointer' }}
                 >
                   <Download size={13} /> PDF Certificate
                 </a>
                 <a 
-                  href={`/api/public/bundle/${publicData?.credentialId || credentialId}`} 
-                  target="_blank" 
+                  href={downloadsDisabled ? undefined : `/api/public/bundle/${publicData?.credentialId || credentialId}`}
+                  target={downloadsDisabled ? undefined : '_blank'}
                   rel="noreferrer"
+                  aria-disabled={downloadsDisabled}
+                  tabIndex={downloadsDisabled ? -1 : 0}
+                  onClick={downloadsDisabled ? (event) => event.preventDefault() : undefined}
                   className="action-btn secondary text-xs" 
-                  style={{ textDecoration: 'none' }}
+                  style={{ textDecoration: 'none', opacity: downloadsDisabled ? 0.5 : 1, cursor: downloadsDisabled ? 'not-allowed' : 'pointer' }}
                 >
                   <FileText size={13} /> Offline Bundle (.json)
                 </a>

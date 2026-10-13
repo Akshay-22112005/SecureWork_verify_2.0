@@ -1,5 +1,6 @@
 const User = require('../models/user.model');
 const Credential = require('../models/credential.model');
+const CredentialVersion = require('../models/credentialVersion.model');
 const Issuer = require('../models/issuer.model');
 const Organization = require('../models/organization.model');
 const IssuerKey = require('../models/issuerKey.model');
@@ -75,14 +76,14 @@ class HrService {
           }
         }
 
-        // 2. Fetch key status
-        let keyStatus = 'UNKNOWN';
-        if (credObj.issuerKeyId) {
-          const key = await IssuerKey.findOne({ keyId: credObj.issuerKeyId });
-          if (key) {
-            keyStatus = key.status;
-          }
-        }
+        // Resolve the signing key through the current credential version.
+        const currentVersion = credObj.currentVersionId
+          ? await CredentialVersion.findOne({ versionId: credObj.currentVersionId })
+          : null;
+        const issuerKeyId = currentVersion?.issuerKeyId || credObj.issuerKeyId;
+        const issuerKeyRecord = issuerKeyId
+          ? await IssuerKey.findOne({ keyId: issuerKeyId })
+          : null;
 
         // 3. Quick verification check
         let engineEvaluation = null;
@@ -91,6 +92,14 @@ class HrService {
         } catch {
           // Non-blocking for summary list
         }
+
+        const signatureValid = engineEvaluation?.checks?.digitalSignature?.passed
+          ?? Boolean(currentVersion?.signature || credObj.signature);
+        const keyStatus = issuerKeyRecord?.status
+          ? issuerKeyRecord.status.toUpperCase()
+          : issuerKeyRecord?.isActive
+            ? 'ACTIVE'
+            : (signatureValid ? 'ACTIVE' : 'UNKNOWN');
 
         return {
           credentialId: credObj.credentialId,
@@ -106,8 +115,17 @@ class HrService {
             status: issuer ? issuer.status : 'UNKNOWN'
           },
           organization: orgInfo,
+          issuerKeyId: issuerKeyId || null,
+          issuerKey: issuerKeyRecord ? {
+            keyId: issuerKeyRecord.keyId,
+            status: issuerKeyRecord.status,
+            isActive: issuerKeyRecord.status === 'ACTIVE',
+            createdAt: issuerKeyRecord.createdAt,
+            expiresAt: issuerKeyRecord.expiresAt
+          } : null,
           keyStatus,
-          signatureValid: engineEvaluation?.checks?.digitalSignature?.passed ?? (credObj.signature ? true : false),
+          signatureValid,
+          digitalSignatureValid: signatureValid,
           isRevoked: credObj.status === 'REVOKED' || engineEvaluation?.checks?.revocationStatus?.isRevoked || false,
           trustLevel: engineEvaluation?.trustLevel || (credObj.status === 'ACTIVE' ? 'LEVEL 5 CURRENTLY_VALID' : 'LEVEL 0 INVALID'),
           result: engineEvaluation?.result || (credObj.status === 'ACTIVE' ? 'VERIFIED' : 'FAILED'),

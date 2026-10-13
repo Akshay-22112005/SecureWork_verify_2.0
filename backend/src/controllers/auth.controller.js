@@ -1,5 +1,6 @@
 const authService = require('../services/auth.service');
 const { successResponse } = require('../utils/response');
+const { ValidationError } = require('../utils/errors');
 
 /**
  * Handle user registration (POST /api/auth/register).
@@ -10,6 +11,17 @@ async function register(req, res, next) {
     const { name, email, password, invitationToken } = req.body;
     const result = await authService.register({ name, email, password, invitationToken });
     return successResponse(res, result, 201);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getInvitationDetails(req, res, next) {
+  try {
+    const invitationToken = String(req.query.invite || req.query.token || '');
+    if (!invitationToken) throw new ValidationError('Invitation token is required');
+    const details = await authService.getOrganizationInviteDetails(invitationToken);
+    return successResponse(res, details, 200);
   } catch (err) {
     next(err);
   }
@@ -41,6 +53,7 @@ async function getMe(req, res, next) {
 
 module.exports = {
   register,
+  getInvitationDetails,
   login,
   getMe
 };

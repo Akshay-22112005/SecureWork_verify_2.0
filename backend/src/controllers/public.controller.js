@@ -1,3 +1,4 @@
+const fs = require('fs');
 const QRCode = require('qrcode');
 const OcrAnalysis = require('../models/ocrAnalysis.model');
 const AIAnalysis = require('../models/aiAnalysis.model');
@@ -14,9 +15,10 @@ const auditService = require('../services/audit.service');
 const { generateCertificatePdf } = require('../utils/certificatePdf');
 const { formatToW3cVerifiableCredential } = require('../utils/w3cFormatter');
 const { buildOfflineBundle } = require('../utils/offlineBundle');
-const { successResponse } = require('../utils/response');
+const { successResponse, errorResponse } = require('../utils/response');
 const { NotFoundError, ValidationError } = require('../utils/errors');
 const env = require('../config/env');
+const logger = require('../utils/logger');
 
 /**
  * Public Verification Controller (Zero Login Required)
@@ -200,7 +202,36 @@ class PublicController {
     try {
       const { id } = req.params;
       const credential = await Credential.findOne({ credentialId: id });
-      if (!credential) throw new NotFoundError('Credential not found');
+      if (!credential) {
+        const analysisForId = await OcrAnalysis.findOne({ analysisId: id }).sort({ ocrTimestamp: -1 });
+        const documentId = analysisForId?.documentId || id;
+        let document = await Document.findOne({ documentId });
+        if (!document && /^[0-9a-fA-F]{24}$/.test(documentId)) {
+          document = await Document.findById(documentId);
+        }
+        if (!document) {
+          return errorResponse(res, 'BUNDLE_NOT_FOUND', 'No registered credential or analyzed document was found for this identifier.', 404);
+        }
+
+        const [ocrRecord, aiRecord] = await Promise.all([
+          OcrAnalysis.findOne({ documentId: document.documentId }).sort({ ocrTimestamp: -1 }),
+          AIAnalysis.findOne({ documentId: document.documentId }).sort({ createdAt: -1 })
+        ]);
+        const bundle = {
+          success: true,
+          data: {
+            bundleType: 'DOCUMENT_ANALYSIS_PROOF',
+            targetId: id,
+            sha256Hash: document.sha256Hash,
+            ocrData: ocrRecord?.toJSON() || null,
+            aiData: aiRecord?.toJSON() || null,
+            status: 'UNREGISTERED_DOCUMENT'
+          }
+        };
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Content-Disposition', `attachment; filename="analysis_bundle_${document.documentId}.json"`);
+        return res.json(bundle);
+      }
 
       const issuer = await Issuer.findOne({ issuerId: credential.issuerId });
       const organization = issuer ? await Organization.findOne({ organizationId: issuer.organizationId }) : null;
@@ -229,31 +260,50 @@ class PublicController {
   async downloadOfflineBundle(req, res, next) {
     try {
       const { id } = req.params;
-      const credential = await Credential.findOne({ credentialId: id });
-      if (!credential) throw new NotFoundError('Credential not found');
+      let credential = await Credential.findOne({ credentialId: id });
+      if (!credential && /^[0-9a-fA-F]{24}$/.test(id)) credential = await Credential.findById(id);
+      if (!credential) return errorResponse(res, 'NOT_FOUND', 'Credential not found', 404);
 
       const activeVersion = credential.currentVersionId
-        ? await CredentialVersion.findOne({ versionId: credential.currentVersionId })
+        ? await CredentialVersion.findOne({ versionId: credential.currentVersionId }).catch(() => null)
         : null;
-      const issuer = await Issuer.findOne({ issuerId: credential.issuerId });
-      const organization = issuer ? await Organization.findOne({ organizationId: issuer.organizationId }) : null;
-      const recipient = await User.findOne({ userId: credential.recipientId });
-      const issuerKeyId = activeVersion?.issuerKeyId || credential.issuerKeyId;
-      const activeKey = issuerKeyId ? await IssuerKey.findOne({ keyId: issuerKeyId }) : null;
-      const auditEntry = await AuditLog.findOne({ targetId: credential.credentialId }).sort({ sequenceNumber: -1 });
+      const [issuer, organization, recipient] = await Promise.all([
+        credential.issuerId ? Issuer.findOne({ issuerId: credential.issuerId }).catch(() => null) : null,
+        credential.organizationId ? Organization.findOne({ organizationId: credential.organizationId }).catch(() => null) : null,
+        credential.recipientId ? User.findOne({ userId: credential.recipientId }).catch(() => null) : null
+      ]);
+      const issuerKeyId = activeVersion?.issuerKeyId || issuer?.publicKeyId || null;
+      const activeKey = issuerKeyId ? await IssuerKey.findOne({ keyId: issuerKeyId }).catch(() => null) : null;
+      const documentRecord = activeVersion?.documentId
+        ? await Document.findOne({ documentId: activeVersion.documentId }).catch(() => null)
+        : null;
+      const auditEntry = credential.credentialId
+        ? await AuditLog.findOne({ targetId: credential.credentialId }).sort({ sequenceNumber: -1 }).catch(() => null)
+        : null;
+      let documentBase64 = null;
+      try {
+        if (documentRecord?.storagePath && fs.existsSync(documentRecord.storagePath)) {
+          documentBase64 = fs.readFileSync(documentRecord.storagePath).toString('base64');
+        }
+      } catch (fsErr) {
+        logger.warn(`Could not read physical document for bundle: ${fsErr.message}`);
+      }
 
       const bundle = buildOfflineBundle({
         credential,
+        activeVersion,
         issuer,
         organization,
         recipient,
         activeKey,
-        auditEntry
+        auditEntry,
+        documentRecord,
+        documentBase64
       });
 
       res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', `attachment; filename="bundle_${credential.credentialId}.json"`);
-      return res.json(bundle);
+      res.setHeader('Content-Disposition', `attachment; filename="bundle_${credential.credentialId || id}.json"`);
+      return res.status(200).send(JSON.stringify(bundle, null, 2));
     } catch (err) {
       next(err);
     }

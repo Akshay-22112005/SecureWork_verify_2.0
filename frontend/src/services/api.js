@@ -10,6 +10,7 @@ export const api = {
   auth: {
     login: (credentials) => apiClient('/auth/login', { method: 'POST', body: credentials }),
     register: (userData) => apiClient('/auth/register', { method: 'POST', body: userData }),
+    getInvitationDetails: (invite) => apiClient(`/auth/invitation?invite=${encodeURIComponent(invite)}`),
     getMe: () => apiClient('/auth/me')
   },
 

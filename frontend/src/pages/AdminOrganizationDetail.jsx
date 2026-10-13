@@ -108,6 +108,15 @@ export default function AdminOrganizationDetail({ onNavigate }) {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkError, setBulkError] = useState('');
   const [bulkSummary, setBulkSummary] = useState(null);
+  const [showHrVerifierModal, setShowHrVerifierModal] = useState(false);
+  const [hrVerifierEmail, setHrVerifierEmail] = useState('');
+  const [hrVerifierCandidate, setHrVerifierCandidate] = useState(null);
+  const [hrVerifierLookup, setHrVerifierLookup] = useState('');
+  const [hrVerifierError, setHrVerifierError] = useState('');
+  const [assigningHrVerifier, setAssigningHrVerifier] = useState(false);
+  const [hrVerifierNotFound, setHrVerifierNotFound] = useState(false);
+  const [sendingHrVerifierInvite, setSendingHrVerifierInvite] = useState(false);
+  const [invitePreviewUrl, setInvitePreviewUrl] = useState('');
 
   // Associated resources
   const [issuers, setIssuers] = useState([]);
@@ -196,6 +205,94 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
   useEffect(() => {
     if (activeTab === 'rbac' && organization) fetchOrganizationUsers();
   }, [activeTab, organization?.organizationId]);
+
+  useEffect(() => {
+    const email = hrVerifierEmail.trim();
+    if (!showHrVerifierModal || !email.includes('@')) {
+      setHrVerifierCandidate(null);
+      setHrVerifierNotFound(false);
+      setHrVerifierLookup('');
+      return undefined;
+    }
+    let cancelled = false;
+    setHrVerifierLookup('Searching…');
+    setHrVerifierError('');
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.admin.searchOrganizationUser(organization.organizationId, email);
+        if (cancelled) return;
+        const result = res?.data || res;
+        if (!result?.found) {
+          setHrVerifierCandidate(null);
+          setHrVerifierNotFound(true);
+          setHrVerifierLookup('No registered account found for this email.');
+        } else if (!result.available) {
+          setHrVerifierCandidate(null);
+          setHrVerifierNotFound(false);
+          setHrVerifierLookup(result.message || 'This account belongs to another organization.');
+        } else {
+          setHrVerifierNotFound(false);
+          setHrVerifierCandidate(result.user || null);
+          setHrVerifierLookup(result.user ? 'Account found and available for this organization.' : 'No assignable account returned.');
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setHrVerifierCandidate(null);
+          setHrVerifierNotFound(false);
+          setHrVerifierLookup(err.message || 'Unable to search users.');
+        }
+      }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [hrVerifierEmail, showHrVerifierModal, organization?.organizationId]);
+
+  function closeHrVerifierModal() {
+    setShowHrVerifierModal(false);
+    setHrVerifierEmail('');
+    setHrVerifierCandidate(null);
+    setHrVerifierNotFound(false);
+    setHrVerifierLookup('');
+    setHrVerifierError('');
+  }
+
+  async function handleAssignHrVerifier() {
+    if (!hrVerifierCandidate) return;
+    setAssigningHrVerifier(true);
+    setHrVerifierError('');
+    try {
+      await api.admin.assignUserToOrganization(
+        organization.organizationId,
+        hrVerifierCandidate.userId || hrVerifierCandidate.id || hrVerifierCandidate._id,
+        'HR'
+      );
+      setMessage(`${hrVerifierCandidate.name} was assigned as an HR Verifier for ${organization.name}.`);
+      closeHrVerifierModal();
+      await fetchOrganizationUsers();
+    } catch (err) {
+      setHrVerifierError(err.message || 'Failed to assign the HR Verifier role.');
+    } finally {
+      setAssigningHrVerifier(false);
+    }
+  }
+
+  async function handleSendHrVerifierInvite() {
+    const email = hrVerifierEmail.trim().toLowerCase();
+    if (!hrVerifierNotFound || !email) return;
+    setSendingHrVerifierInvite(true);
+    setHrVerifierError('');
+    setInvitePreviewUrl('');
+    try {
+      const res = await api.admin.inviteUserToOrganization(organization.organizationId, { email, role: 'HR' });
+      const result = res?.data || res;
+      setMessage(`Invitation link sent to ${email}`);
+      setInvitePreviewUrl(result?.previewUrl || '');
+      closeHrVerifierModal();
+    } catch (err) {
+      setHrVerifierError(err.message || 'Failed to send the HR Verifier invitation.');
+    } finally {
+      setSendingHrVerifierInvite(false);
+    }
+  }
 
   async function searchUnassignedUsers() {
     const email = assignUserEmail.trim();
@@ -627,6 +724,7 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
         <div className="alert-banner success" style={{ marginBottom: '1rem' }}>
           <CheckCircle2 size={16} />
           <span>{message}</span>
+          {invitePreviewUrl && <a href={invitePreviewUrl} target="_blank" rel="noreferrer" style={{ marginLeft: '0.5rem', color: 'inherit', textDecoration: 'underline' }}>Open email preview</a>}
         </div>
       )}
 
@@ -881,6 +979,12 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
               </button>
               <button
                 className="action-btn secondary text-xs"
+                onClick={() => { setHrVerifierEmail(''); setHrVerifierCandidate(null); setHrVerifierNotFound(false); setHrVerifierLookup(''); setHrVerifierError(''); setShowHrVerifierModal(true); }}
+              >
+                + Onboard HR Verifier
+              </button>
+              <button
+                className="action-btn secondary text-xs"
                 onClick={() => { setBulkCsvText(''); setBulkRows([]); setBulkError(''); setBulkSummary(null); setShowBulkUploadModal(true); }}
               >
                 + Bulk CSV Upload
@@ -1085,6 +1189,44 @@ const org = res?.data?.organization || res?.organization || (res?.success ? res.
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem' }}>
               <button type="button" className="action-btn secondary text-xs" onClick={() => setShowRegisterModal(false)} disabled={registeringIssuer}>Cancel</button>
               <button type="button" className="action-btn primary text-xs" onClick={handleConfirmRegisterIssuer} disabled={!verifiedUser || registeringIssuer}>{registeringIssuer ? 'Registering…' : 'Confirm & Bind Issuer'}</button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {showHrVerifierModal && (
+        <div role="presentation" onClick={(event) => { if (event.target === event.currentTarget && !assigningHrVerifier) closeHrVerifierModal(); }} style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(0,0,0,0.68)', display: 'grid', placeItems: 'center', padding: '1rem' }}>
+          <section role="dialog" aria-modal="true" aria-labelledby="hr-verifier-title" className="glass-card" style={{ width: 'min(100%, 560px)', padding: '1.5rem', boxShadow: '0 20px 70px rgba(0,0,0,0.45)' }}>
+            <h2 id="hr-verifier-title" style={{ marginTop: 0 }}>Assign HR Verifier Role for {organization.name}</h2>
+            <label className="text-muted" htmlFor="hr-verifier-email">Enter user email</label>
+            <input
+              id="hr-verifier-email"
+              type="email"
+              className="form-input"
+              value={hrVerifierEmail}
+              onChange={(event) => { setHrVerifierEmail(event.target.value); setHrVerifierCandidate(null); setHrVerifierError(''); }}
+              placeholder="name@example.com"
+              autoComplete="email"
+              style={{ display: 'block', width: '100%', marginTop: '0.35rem' }}
+            />
+            {hrVerifierLookup && <div role="status" className="text-muted" style={{ marginTop: '0.65rem' }}>{hrVerifierLookup}</div>}
+            {hrVerifierCandidate && (
+              <div className="glass-card" style={{ padding: '0.85rem', marginTop: '0.85rem' }}>
+                <strong style={{ display: 'block' }}>{hrVerifierCandidate.name}</strong>
+                <span className="text-muted">{hrVerifierCandidate.email}</span>
+                <div className="text-muted text-xs" style={{ marginTop: '0.4rem' }}>Current role: {hrVerifierCandidate.role || 'USER'} · Will be scoped to {organization.name}</div>
+              </div>
+            )}
+            {hrVerifierError && <div role="alert" className="alert-banner danger" style={{ marginTop: '1rem' }}><AlertTriangle size={16} /><span>{hrVerifierError}</span></div>}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '1.25rem' }}>
+              <button type="button" className="action-btn secondary text-xs" onClick={closeHrVerifierModal} disabled={assigningHrVerifier || sendingHrVerifierInvite}>Cancel</button>
+              {hrVerifierNotFound ? (
+                <button type="button" className="action-btn primary text-xs" onClick={handleSendHrVerifierInvite} disabled={sendingHrVerifierInvite}>
+                  {sendingHrVerifierInvite ? 'Sending…' : 'Send Registration Invite'}
+                </button>
+              ) : (
+                <button type="button" className="action-btn primary text-xs" onClick={handleAssignHrVerifier} disabled={!hrVerifierCandidate || assigningHrVerifier}>{assigningHrVerifier ? 'Assigning…' : 'Confirm HR Assignment'}</button>
+              )}
             </div>
           </section>
         </div>

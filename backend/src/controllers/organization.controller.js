@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const jwt = require('jsonwebtoken');
 const organizationService = require('../services/organization.service');
 const Organization = require('../models/organization.model');
 const User = require('../models/user.model');
@@ -8,9 +9,11 @@ const issuerKeyService = require('../services/issuerKey.service');
 const TrustedSource = require('../models/trustedSource.model');
 const emailService = require('../services/email.service');
 const auditService = require('../services/audit.service');
+const notificationService = require('../services/notification.service');
 const { successResponse } = require('../utils/response');
 const { NotFoundError, ValidationError } = require('../utils/errors');
 const { isValidEmail } = require('../utils/validation');
+const env = require('../config/env');
 
 async function findOrganization(identifier) {
   const clauses = [{ organizationId: identifier }, { organizationCode: identifier.toUpperCase() }];
@@ -135,7 +138,7 @@ async function assignUserToOrganization(req, res, next) {
   try {
     const { userId, role = 'ISSUER' } = req.body;
     if (!userId) throw new ValidationError('userId is required');
-    if (!['ISSUER', 'MEMBER'].includes(role)) throw new ValidationError('role must be ISSUER or MEMBER');
+    if (!['ISSUER', 'MEMBER', 'HR'].includes(role)) throw new ValidationError('role must be ISSUER, MEMBER, or HR');
     const [organization, user] = await Promise.all([
       findOrganization(req.params.id),
       findUser(userId)
@@ -143,6 +146,23 @@ async function assignUserToOrganization(req, res, next) {
     user.organizationId = organization._id;
     user.role = role;
     await user.save();
+    if (role === 'HR') {
+      await auditService.recordEvent(
+        req.user?.userId || req.user?.id,
+        req.user?.role || 'ADMIN',
+        'USER_ROLE_UPDATED_TO_HR',
+        user.userId,
+        { organizationId: organization.organizationId, organizationName: organization.name, userId: user.userId, email: user.email }
+      );
+      await notificationService.notifyUser({
+        recipientUserId: user.userId,
+        type: 'GENERAL',
+        title: 'HR Verifier Role Assigned',
+        message: `You have been assigned as an HR Verifier for ${organization.name}`,
+        severity: 'SUCCESS',
+        data: { organizationId: organization.organizationId, role: 'HR' }
+      });
+    }
     return successResponse(res, { user: user.toJSON() }, 200);
   } catch (err) {
     next(err);
@@ -413,58 +433,60 @@ async function inviteUserToOrganization(req, res, next) {
   try {
     const organization = await findOrganization(req.params.id);
     const email = String(req.body?.email || '').trim().toLowerCase();
-    const role = String(req.body?.role || 'ISSUER').trim().toUpperCase();
     if (!isValidEmail(email)) throw new ValidationError('A valid email address is required');
-    if (!['ISSUER', 'MEMBER'].includes(role)) throw new ValidationError('Role must be ISSUER or MEMBER');
+    const role = String(req.body?.role || 'HR').trim().toUpperCase();
+    if (role !== 'HR') throw new ValidationError('Only the HR role can be invited through this endpoint');
 
-    let user = await User.findOne({ email });
-    let invitationSent = false;
-    if (user?.status === 'PENDING_INVITE') {
+    const user = await User.findOne({ email });
+    if (user) {
+      if (user.organizationId && String(user.organizationId) !== String(organization._id)) {
+        throw new ValidationError('This account is already assigned to another organization');
+      }
       user.organizationId = organization._id;
       user.role = role;
-      const inviteToken = crypto.randomBytes(32).toString('hex');
-      await sendInvitationForUser(user, organization, inviteToken);
-      invitationSent = true;
-    } else if (user) {
-      user.organizationId = organization._id;
-      user.role = role;
-      user.status = 'ACTIVE';
-      user.invitationToken = null;
-      user.invitationExpiresAt = null;
       await user.save();
-    } else {
-      const inviteToken = crypto.randomBytes(32).toString('hex');
-      const name = String(req.body?.name || email.split('@')[0]).trim();
-      user = await User.create({
-        name,
-        email,
-        organizationId: organization._id,
-        role,
-        status: 'PENDING_INVITE',
-        passwordHash: null,
-        invitationToken: inviteToken,
-        invitationExpiresAt: new Date(Date.now() + INVITATION_TTL_MS)
+      await auditService.recordEvent(
+        req.user?.userId || req.user?.id,
+        req.user?.role || 'ADMIN',
+        'USER_ROLE_UPDATED_TO_HR',
+        user.userId,
+        { organizationId: organization.organizationId, organizationName: organization.name, userId: user.userId, email }
+      );
+      await notificationService.notifyUser({
+        recipientUserId: user.userId,
+        type: 'GENERAL',
+        title: 'HR Verifier Role Assigned',
+        message: `You have been assigned as an HR Verifier for ${organization.name}`,
+        severity: 'SUCCESS',
+        data: { organizationId: organization.organizationId, role: 'HR' }
       });
-      await emailService.sendOrganizationInvitation({
-        email,
-        name,
-        organizationName: organization.name,
-        inviteToken,
-        role
-      });
-      invitationSent = true;
+      return successResponse(res, {
+        message: `Existing user assigned as an HR Verifier for ${organization.name}.`,
+        user: user.toJSON()
+      }, 200);
     }
 
+    const inviteToken = jwt.sign({
+      email,
+      organizationId: String(organization._id),
+      role: 'HR',
+      purpose: 'ORGANIZATION_INVITE'
+    }, env.JWT_SECRET, { algorithm: 'HS256', expiresIn: '7d' });
+    const emailResult = await emailService.sendOrganizationInviteEmail({
+      email,
+      organizationName: organization.name,
+      inviteToken
+    });
     await auditService.recordEvent(
       req.user?.userId || req.user?.id,
       req.user?.role || 'ADMIN',
-      'ORG_USER_INVITED',
+      'ORGANIZATION_USER_INVITED',
       organization.organizationId,
-      { userId: user.userId, email, role, status: user.status, invitationSent }
+      { email, role: 'HR', invitationExpiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() }
     );
     return successResponse(res, {
-      message: invitationSent ? 'Invitation sent successfully' : 'Existing user added to organization successfully',
-      user: user.toJSON()
+      message: 'Invitation email dispatched successfully.',
+      previewUrl: emailResult?.previewUrl || null
     }, 200);
   } catch (err) {
     next(err);

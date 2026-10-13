@@ -1,7 +1,21 @@
 const User = require('../models/user.model');
+const Organization = require('../models/organization.model');
 const { generateToken, verifyToken } = require('../utils/jwt');
 const { ValidationError, ConflictError, UnauthorizedError, NotFoundError } = require('../utils/errors');
 const { isValidEmail } = require('../utils/validation');
+
+function readOrganizationInvite(invitationToken) {
+  let claims;
+  try {
+    claims = verifyToken(invitationToken);
+  } catch {
+    throw new NotFoundError('Invitation token is invalid or has expired', 'INVITATION_INVALID');
+  }
+  if (claims.purpose !== 'ORGANIZATION_INVITE' || claims.role !== 'HR' || !claims.email || !claims.organizationId) {
+    throw new NotFoundError('Invitation token is invalid or has expired', 'INVITATION_INVALID');
+  }
+  return claims;
+}
 
 /**
  * Authentication Service
@@ -25,6 +39,32 @@ class AuthService {
     }
 
     if (invitationToken) {
+      if (String(invitationToken).split('.').length === 3) {
+        const claims = readOrganizationInvite(invitationToken);
+        const normalizedEmail = String(email || '').trim().toLowerCase();
+        if (!isValidEmail(normalizedEmail) || normalizedEmail !== String(claims.email).toLowerCase()) {
+          throw new ValidationError('Registration email does not match the invitation');
+        }
+        if (!name || typeof name !== 'string' || name.trim().length === 0) {
+          throw new ValidationError('Name is required');
+        }
+        if (await User.findOne({ email: normalizedEmail })) {
+          throw new ConflictError('Email is already registered', 'DUPLICATE_EMAIL');
+        }
+        const organization = await Organization.findById(claims.organizationId);
+        if (!organization) throw new NotFoundError('Invited organization no longer exists', 'ORGANIZATION_NOT_FOUND');
+        const passwordHash = await User.hashPassword(password);
+        const user = await User.create({
+          name: name.trim(),
+          email: normalizedEmail,
+          passwordHash,
+          status: 'ACTIVE',
+          role: 'HR',
+          organizationId: organization._id
+        });
+        return { user: user.toJSON(), token: generateToken(user) };
+      }
+
       const passwordHash = await User.hashPassword(password);
       const pendingInvite = await User.findOne({
         invitationToken,
@@ -143,6 +183,18 @@ class AuthService {
    */
   verifyToken(token) {
     return verifyToken(token);
+  }
+
+  async getOrganizationInviteDetails(invitationToken) {
+    const claims = readOrganizationInvite(invitationToken);
+    const organization = await Organization.findById(claims.organizationId).select('name organizationId');
+    if (!organization) throw new NotFoundError('Invited organization no longer exists', 'ORGANIZATION_NOT_FOUND');
+    return {
+      email: claims.email,
+      role: claims.role,
+      organizationId: organization.organizationId,
+      organizationName: organization.name
+    };
   }
 
   /**

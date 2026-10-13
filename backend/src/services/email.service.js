@@ -9,6 +9,7 @@ const env = require('../config/env');
 class EmailService {
   constructor() {
     this.transporter = null;
+    this.usesJsonFallback = false;
     this.initPromise = this._initTransporter();
   }
 
@@ -31,11 +32,13 @@ class EmailService {
       } catch (err) {
         logger.warn(`[EmailService] SMTP verification failed for ${smtpUser}: ${err.message}; using JSON fallback.`);
         this.transporter = nodemailer.createTransport({ jsonTransport: true });
+        this.usesJsonFallback = true;
         logger.info('[EmailService] Fallback JSON transport initialized.');
       }
     } else {
       // Keep local startup independent of external test SMTP account provisioning.
       this.transporter = nodemailer.createTransport({ jsonTransport: true });
+      this.usesJsonFallback = true;
       logger.info('[EmailService] SMTP credentials missing; using in-memory JSON fallback transport.');
     }
   }
@@ -69,6 +72,7 @@ class EmailService {
       // If not already using JSON transport, fallback and retry once
       if (!this.transporter || (this.transporter.options && !this.transporter.options.jsonTransport)) {
         this.transporter = nodemailer.createTransport({ jsonTransport: true });
+        this.usesJsonFallback = true;
         try {
           const retryInfo = await this.transporter.sendMail({
             from: sender,
@@ -120,6 +124,41 @@ class EmailService {
     });
     if (!info) return { success: false, messageId: null };
     return { success: true, messageId: info.messageId };
+  }
+
+  async sendOrganizationInviteEmail({ email, organizationName, inviteToken }) {
+    await this.initPromise;
+    if (this.usesJsonFallback && !env.IS_TEST) {
+      try {
+        const account = await nodemailer.createTestAccount();
+        this.transporter = nodemailer.createTransport({
+          host: 'smtp.ethereal.email',
+          port: 587,
+          secure: false,
+          auth: { user: account.user, pass: account.pass }
+        });
+        this.usesJsonFallback = false;
+      } catch (err) {
+        logger.warn(`[EmailService] Ethereal setup failed; keeping JSON fallback: ${err.message}`);
+      }
+    }
+
+    const frontendUrl = (env.FRONTEND_URL || process.env.FRONTEND_URL).replace(/\/+$/, '');
+    const inviteUrl = `${frontendUrl}/register?invite=${encodeURIComponent(inviteToken)}&email=${encodeURIComponent(email)}`;
+    const escapeHtml = (value) => String(value || '').replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[character]));
+    const safeOrganization = escapeHtml(organizationName);
+    const safeEmail = escapeHtml(email);
+    const info = await this.sendEmail({
+      to: email,
+      subject: `Invitation to join ${organizationName} as an HR Verifier`,
+      text: `You have been invited to join ${organizationName} as an HR Verifier. Complete registration at ${inviteUrl}. This invitation expires in 7 days.`,
+      html: `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:28px;background:#0b1120;color:#e2e8f0;border-radius:12px"><h1>You’re invited to join ${safeOrganization}</h1><p>${safeEmail}, you have been invited as an HR Verifier.</p><p>This invitation expires in 7 days.</p><a href="${inviteUrl}" style="display:inline-block;padding:12px 20px;background:#8b5cf6;color:#fff;text-decoration:none;border-radius:6px">Accept invitation</a></div>`
+    });
+    if (!info) return { success: false, messageId: null, previewUrl: null };
+    const previewUrl = nodemailer.getTestMessageUrl(info) || null;
+    return { success: true, messageId: info.messageId, previewUrl };
   }
 
   async sendCredentialIssuedEmail(recipientEmailOrUser, recipientNameOrCred, credentialTitle, verifyUrl) {

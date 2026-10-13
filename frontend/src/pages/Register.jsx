@@ -1,17 +1,40 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Shield, Lock, Mail, User, AlertCircle, ArrowRight } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import AnimatedBackground from '../components/AnimatedBackground';
+import api from '../services/api';
 
 export default function Register({ onNavigate }) {
   const { register } = useAuth();
-  const invitationToken = new URLSearchParams(window.location.search).get('token') || '';
+  const searchParams = new URLSearchParams(window.location.search);
+  const signedInvitationToken = searchParams.get('invite') || '';
+  const invitationToken = signedInvitationToken || searchParams.get('token') || '';
+  const invitedEmail = searchParams.get('email') || '';
   const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(invitedEmail);
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [invitation, setInvitation] = useState(null);
+  const [invitationLoading, setInvitationLoading] = useState(Boolean(signedInvitationToken));
+
+  useEffect(() => {
+    if (!signedInvitationToken) return undefined;
+    let cancelled = false;
+    api.auth.getInvitationDetails(signedInvitationToken)
+      .then((res) => {
+        if (cancelled) return;
+        const details = res?.data || res;
+        setInvitation(details);
+        setEmail(details?.email || invitedEmail);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || 'This invitation is invalid or expired.');
+      })
+      .finally(() => { if (!cancelled) setInvitationLoading(false); });
+    return () => { cancelled = true; };
+  }, [signedInvitationToken]);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -54,6 +77,13 @@ export default function Register({ onNavigate }) {
           </p>
         </div>
 
+        {signedInvitationToken && invitation && (
+          <div className="alert-banner success" role="status" style={{ marginBottom: '1rem' }}>
+            You were invited to join {invitation.organizationName} as an HR Verifier.
+          </div>
+        )}
+        {invitationLoading && <div className="text-muted text-xs" role="status">Validating your invitation…</div>}
+
         {error && (
           <div className="alert-banner danger">
             <AlertCircle size={16} />
@@ -85,6 +115,7 @@ export default function Register({ onNavigate }) {
                 placeholder="jane.doe@organization.edu"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                readOnly={Boolean(signedInvitationToken)}
                 required={!invitationToken}
               />
             </div>

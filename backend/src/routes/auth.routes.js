@@ -6,6 +6,7 @@ const router = express.Router();
 
 // Public auth endpoints
 router.post('/register', authController.register);
+router.get('/invitation', authController.getInvitationDetails);
 router.post('/login', authController.login);
 
 // Protected auth profile endpoint
