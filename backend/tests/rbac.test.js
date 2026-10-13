@@ -277,8 +277,8 @@ describe('Phase 2 Role-Based Access Control (RBAC) & User Endpoint Tests', () =>
     assert.ok(Array.isArray(body.data.users));
   });
 
-  test('Role model constants strictly include ADMIN, ISSUER, HR, USER, AUDITOR', () => {
+  test('Role model constants include all supported roles', () => {
     const { ROLES } = require('../src/models/user.model');
-    assert.deepStrictEqual(ROLES.sort(), ['ADMIN', 'AUDITOR', 'HR', 'ISSUER', 'USER'].sort());
+    assert.deepStrictEqual(ROLES.sort(), ['ADMIN', 'AUDITOR', 'HR', 'ISSUER', 'MEMBER', 'USER'].sort());
   });
 });

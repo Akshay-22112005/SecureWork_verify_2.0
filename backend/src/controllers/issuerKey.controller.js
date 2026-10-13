@@ -45,7 +45,7 @@ async function generateKey(req, res, next) {
   try {
     const issuerId = req.params.id || req.body?.issuerId || req.body?.organizationId;
     const key = await issuerKeyService.generateKeyForIssuer(issuerId, req.user);
-    return successResponse(res, { key }, 200);
+    return successResponse(res, { key }, 201);
   } catch (err) {
     next(err);
   }

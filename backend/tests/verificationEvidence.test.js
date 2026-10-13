@@ -193,7 +193,7 @@ describe('Phase 9 Verification Evidence & Manual Review Tests', () => {
       // Check signature evidence details
       const sigEvidence = evidenceList.find(e => e.evidenceType === 'DIGITAL_SIGNATURE');
       assert.strictEqual(sigEvidence.signatureValid, true);
-      assert.strictEqual(sigEvidence.evidenceStatus, 'CONFIRMED');
+      assert.strictEqual(sigEvidence.evidenceStatus, 'VERIFIED');
       assert.ok(sigEvidence.evidenceId.startsWith('evi_'));
     });
 

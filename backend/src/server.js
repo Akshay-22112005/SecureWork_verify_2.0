@@ -1,4 +1,5 @@
 const fs = require('fs');
+const path = require('path');
 const app = require('./app');
 const env = require('./config/env');
 const { connectDB, disconnectDB } = require('./config/db');
@@ -14,6 +15,10 @@ function ensureDirectories() {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
       logger.info(`Created required directory: ${dir}`);
+    }
+    const keepFile = path.join(dir, '.gitkeep');
+    if (!fs.existsSync(keepFile)) {
+      fs.writeFileSync(keepFile, '');
     }
   }
 }
