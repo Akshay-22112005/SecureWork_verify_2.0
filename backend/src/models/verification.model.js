@@ -33,6 +33,16 @@ const VerificationSchema = new mongoose.Schema({
     default: 'PUBLIC',
     index: true
   },
+  verifierUserId: {
+    type: String,
+    default: null,
+    index: true
+  },
+  verifierOrganizationId: {
+    type: String,
+    default: null,
+    index: true
+  },
   subjectUserId: {
     type: String,
     default: null,

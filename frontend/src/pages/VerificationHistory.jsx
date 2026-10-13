@@ -8,6 +8,12 @@ import { useAuth } from '../context/AuthContext';
 export default function VerificationHistory({ initialParams = {}, onNavigate }) {
   const { user } = useAuth();
   const isCandidate = user?.role === 'USER' || user?.role === 'MEMBER';
+  const isHr = user?.role === 'HR';
+  const hrStatusFor = (verification) => {
+    if (verification.cryptographicStatus === 'FAILED') return 'UNMATCHED HASH';
+    if (verification.humanVerificationStatus === 'PENDING' || ['PENDING', 'MANUAL_REVIEW'].includes(verification.finalResult || verification.result)) return 'PENDING REVIEW';
+    return 'VERIFIED';
+  };
   const [verifications, setVerifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -110,9 +116,9 @@ export default function VerificationHistory({ initialParams = {}, onNavigate }) 
 
       <div className="page-header">
         <div>
-          <h2>{isCandidate ? 'Your Verification History' : 'Candidate Verification Logs & Audit History'}</h2>
+          <h2>{isHr ? 'HR Organization Verification Audit Trail' : isCandidate ? 'Your Verification History' : 'Candidate Verification Logs & Audit History'}</h2>
           <p className="page-subtitle">
-            {isCandidate ? 'Review the verification checks linked to your credentials.' : 'Immutable log of evaluation runs, cryptographic checks, and auditor determinations.'}
+            {isHr ? 'Verification checks initiated by your organization, with their review status.' : isCandidate ? 'Review the verification checks linked to your credentials.' : 'Immutable log of evaluation runs, cryptographic checks, and auditor determinations.'}
           </p>
         </div>
         <button className="action-btn secondary text-xs" onClick={loadHistory} disabled={loading}>

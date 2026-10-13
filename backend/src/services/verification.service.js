@@ -88,7 +88,9 @@ class VerificationService {
       credentialId: input.credentialId || null,
       documentId: input.documentId || null,
       documentHash: input.documentHash || null,
-      requestedBy: user ? user.userId : 'PUBLIC',
+      requestedBy: user ? (user.userId || user.id) : 'PUBLIC',
+      verifierUserId: user ? (user.userId || user.id) : null,
+      verifierOrganizationId: user?.organizationId || null,
       subjectUserId,
       candidateEmail,
       result: evaluation.result,
@@ -417,11 +419,18 @@ class VerificationService {
    */
   async listVerifications(filters = {}, user = null) {
     const query = {};
-    if (user?.role === 'USER') {
+    if (user?.role === 'HR') {
+      query.$or = [
+        { verifierUserId: user.userId || user.id },
+        { verifierOrganizationId: user.organizationId }
+      ].filter((condition) => Object.values(condition)[0] != null);
+      if (query.$or.length === 0) query._id = { $exists: false };
+    } else if (user?.role === 'USER') {
       query.$or = [
         { subjectUserId: user.userId || user.id },
         { candidateEmail: (user.email || '').toLowerCase() }
-      ];
+      ].filter((condition) => Object.values(condition)[0] != null && Object.values(condition)[0] !== '');
+      if (query.$or.length === 0) query._id = { $exists: false };
     }
     if (filters.credentialId) query.credentialId = filters.credentialId;
     if (filters.result) query.result = filters.result;
