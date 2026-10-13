@@ -1,7 +1,7 @@
 const express = require('express');
 const ocrController = require('../controllers/ocr.controller');
 const { optionalAuthenticateUser, authenticateUser } = require('../middleware/auth');
-const { handleDocumentUpload } = require('../middleware/upload');
+const { handleDocumentUpload, handleOptionalDocumentUpload } = require('../middleware/upload');
 
 const router = express.Router();
 
@@ -12,7 +12,10 @@ router.post('/upload', optionalAuthenticateUser, handleDocumentUpload, ocrContro
 router.post('/document', optionalAuthenticateUser, ocrController.performDocumentAnalysis);
 
 // Execute OCR text extraction on document (POST /api/analysis/ocr)
-router.post('/ocr', optionalAuthenticateUser, ocrController.performOcrAnalysis);
+router.post('/ocr', optionalAuthenticateUser, handleOptionalDocumentUpload, ocrController.performOcrAnalysis);
+
+// Direct uploaded-file heuristic tamper inspection (POST /api/analysis/tamper)
+router.post('/tamper', optionalAuthenticateUser, handleOptionalDocumentUpload, ocrController.performTamperCheck);
 
 // Retrieve document analysis by documentId (GET /api/analysis/:documentId)
 router.get('/:documentId', optionalAuthenticateUser, ocrController.getDocumentAnalysis);

@@ -3,8 +3,11 @@ import { History, ShieldCheck, Search, Eye, RefreshCw, X } from 'lucide-react';
 import api from '../services/api';
 import StatusBadge from '../components/StatusBadge';
 import TrustEvidenceCard from '../components/TrustEvidenceCard';
+import { useAuth } from '../context/AuthContext';
 
 export default function VerificationHistory({ initialParams = {}, onNavigate }) {
+  const { user } = useAuth();
+  const isCandidate = user?.role === 'USER' || user?.role === 'MEMBER';
   const [verifications, setVerifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -58,7 +61,8 @@ export default function VerificationHistory({ initialParams = {}, onNavigate }) 
     return (
       (v.verificationId && v.verificationId.toLowerCase().includes(q)) ||
       (v.credentialId && v.credentialId.toLowerCase().includes(q)) ||
-      (v.documentHash && v.documentHash.toLowerCase().includes(q)) ||
+      (!isCandidate && v.documentHash && v.documentHash.toLowerCase().includes(q)) ||
+      (v.credentialTitle && v.credentialTitle.toLowerCase().includes(q)) ||
       (v.finalResult && v.finalResult.toLowerCase().includes(q))
     );
   });
@@ -73,9 +77,9 @@ export default function VerificationHistory({ initialParams = {}, onNavigate }) 
             style={{ cursor: 'pointer', color: 'var(--accent-cyan)' }} 
             onClick={() => onNavigate && onNavigate('dashboard')}
           >
-            HR Dashboard
+            {isCandidate ? 'My Account' : 'HR Dashboard'}
           </span>
-          <span className="text-muted">→</span>
+          {!isCandidate && <><span className="text-muted">→</span>
           <span 
             style={{ cursor: 'pointer', color: 'var(--accent-cyan)' }} 
             onClick={() => onNavigate && onNavigate('verify_document', { 
@@ -98,7 +102,7 @@ export default function VerificationHistory({ initialParams = {}, onNavigate }) 
             })}
           >
             Discrete Evidence
-          </span>
+          </span></>}
           <span className="text-muted">→</span>
           <strong style={{ color: 'var(--accent-blue)', textDecoration: 'underline' }}>Candidate Verification Logs (Inspecting)</strong>
         </div>
@@ -106,9 +110,9 @@ export default function VerificationHistory({ initialParams = {}, onNavigate }) 
 
       <div className="page-header">
         <div>
-          <h2>Candidate Verification Logs & Audit History</h2>
+          <h2>{isCandidate ? 'Your Verification History' : 'Candidate Verification Logs & Audit History'}</h2>
           <p className="page-subtitle">
-            Immutable log of all evaluation runs, cryptographic checks, and auditor determinations.
+            {isCandidate ? 'Review the verification checks linked to your credentials.' : 'Immutable log of evaluation runs, cryptographic checks, and auditor determinations.'}
           </p>
         </div>
         <button className="action-btn secondary text-xs" onClick={loadHistory} disabled={loading}>
@@ -122,7 +126,7 @@ export default function VerificationHistory({ initialParams = {}, onNavigate }) 
           <Search size={16} className="search-icon" />
           <input
             type="text"
-            placeholder="Search by Verification ID, Credential ID, or Document Hash..."
+            placeholder={isCandidate ? 'Search by verification or credential title...' : 'Search by Verification ID, Credential ID, or Document Hash...'}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="search-input"
@@ -158,10 +162,10 @@ export default function VerificationHistory({ initialParams = {}, onNavigate }) 
             <thead>
               <tr>
                 <th>Verification ID</th>
-                <th>Target Credential / Hash</th>
-                <th>Cryptographic Status</th>
-                <th>Categorical Result</th>
-                <th>Trust Level</th>
+                <th>{isCandidate ? 'Verification Target' : 'Target Credential / Hash'}</th>
+                <th>{isCandidate ? 'Verification Status' : 'Cryptographic Status'}</th>
+                {!isCandidate && <th>Categorical Result</th>}
+                {!isCandidate && <th>Trust Level</th>}
                 <th>Evaluated At</th>
                 <th>Inspect</th>
               </tr>
@@ -175,16 +179,21 @@ export default function VerificationHistory({ initialParams = {}, onNavigate }) 
                   title="Click to inspect this exact verification run"
                 >
                   <td className="code-snippet" style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>{v.verificationId}</td>
-                  <td>
-                    {v.credentialId ? (
-                      <span className="code-snippet">{v.credentialId}</span>
-                    ) : (
-                      <span className="code-snippet text-muted">{v.documentHash ? `${v.documentHash.slice(0, 16)}...` : 'N/A'}</span>
-                    )}
+                  <td>{isCandidate
+                    ? <span>{v.credentialTitle || 'Official Document Hash Check'}</span>
+                    : v.credentialId
+                      ? <span className="code-snippet">{v.credentialTitle || v.credentialId}</span>
+                      : <span className="code-snippet text-muted">{v.documentHash ? `${v.documentHash.slice(0, 16)}...` : 'N/A'}</span>}
                   </td>
-                  <td><StatusBadge status={v.cryptographicStatus} /></td>
-                  <td><StatusBadge status={v.finalResult || v.result} /></td>
-                  <td><span className="level-badge">{v.trustLevel || 'LEVEL 0'}</span></td>
+                  <td>{isCandidate ? (() => {
+                    const successful = v.cryptographicStatus === 'PASSED' || ['VERIFIED', 'PASSED'].includes(v.finalResult || v.result);
+                    const pending = v.humanVerificationStatus === 'PENDING' || ['PENDING', 'MANUAL_REVIEW'].includes(v.finalResult || v.result);
+                    return <span className="level-badge" style={{ color: successful ? '#10b981' : pending ? '#f59e0b' : '#ef4444', borderColor: successful ? 'rgba(16,185,129,.4)' : pending ? 'rgba(245,158,11,.4)' : 'rgba(239,68,68,.4)', background: successful ? 'rgba(16,185,129,.12)' : pending ? 'rgba(245,158,11,.12)' : 'rgba(239,68,68,.12)' }}>
+                      {successful ? 'Successful Background Verification' : pending ? 'Verification Under Compliance Review' : 'Verification Needs Attention'}
+                    </span>;
+                  })() : <StatusBadge status={v.cryptographicStatus} />}</td>
+                  {!isCandidate && <td><StatusBadge status={v.finalResult || v.result} /></td>}
+                  {!isCandidate && <td><span className="level-badge">{v.trustLevel || 'LEVEL 0'}</span></td>}
                   <td className="text-muted text-xs">{new Date(v.evaluatedAt || v.createdAt).toLocaleString()}</td>
                   <td>
                     <div style={{ display: 'flex', gap: '0.4rem' }}>
@@ -198,7 +207,7 @@ export default function VerificationHistory({ initialParams = {}, onNavigate }) 
                       >
                         Inspect →
                       </button>
-                      {onNavigate && (
+                      {onNavigate && !isCandidate && (
                         <button 
                           className="icon-action-btn"
                           style={{ color: 'var(--accent-purple)' }}
@@ -231,11 +240,22 @@ export default function VerificationHistory({ initialParams = {}, onNavigate }) 
               </button>
             </div>
             <div className="modal-body">
-              <TrustEvidenceCard verification={selectedVerification} />
+              {isCandidate ? (
+                <div className="glass-card" style={{ padding: '1rem' }}>
+                  <h4 style={{ marginTop: 0 }}>Verification Summary</h4>
+                  <p><strong>Target:</strong> {selectedVerification.credentialTitle || 'Official Document Hash Check'}</p>
+                  <p><strong>Status:</strong> {selectedVerification.cryptographicStatus === 'PASSED' || ['VERIFIED', 'PASSED'].includes(selectedVerification.finalResult || selectedVerification.result)
+                    ? 'Successful Background Verification'
+                    : selectedVerification.humanVerificationStatus === 'PENDING' || ['PENDING', 'MANUAL_REVIEW'].includes(selectedVerification.finalResult || selectedVerification.result)
+                      ? 'Verification Under Compliance Review'
+                      : 'Verification Needs Attention'}</p>
+                  <p className="text-muted text-sm">Evaluated {new Date(selectedVerification.evaluatedAt || selectedVerification.createdAt).toLocaleString()}</p>
+                </div>
+              ) : <TrustEvidenceCard verification={selectedVerification} />}
 
               {onNavigate && (
                 <div style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  <button 
+                  {!isCandidate && <button
                     className="action-btn secondary text-xs"
                     onClick={() => {
                       setSelectedVerification(null);
@@ -243,8 +263,8 @@ export default function VerificationHistory({ initialParams = {}, onNavigate }) 
                     }}
                   >
                     Back to Dashboard
-                  </button>
-                  <button 
+                  </button>}
+                  {!isCandidate && <button
                     className="action-btn secondary text-xs"
                     onClick={() => {
                       const vId = selectedVerification.verificationId;
@@ -254,7 +274,7 @@ export default function VerificationHistory({ initialParams = {}, onNavigate }) 
                     }}
                   >
                     Inspect Discrete Evidence Records →
-                  </button>
+                  </button>}
                   <button 
                     className="action-btn primary text-xs"
                     disabled={!selectedVerification.credentialId && !selectedVerification.credentialHash && !selectedVerification.verificationId}

@@ -8,7 +8,7 @@ const { successResponse } = require('../utils/response');
  */
 async function listVerifications(req, res, next) {
   try {
-    const verifications = await verificationService.listVerifications(req.query);
+    const verifications = await verificationService.listVerifications(req.query, req.user);
     return successResponse(res, { verifications }, 200);
   } catch (err) {
     next(err);
@@ -50,7 +50,7 @@ async function verifySource(req, res, next) {
  */
 async function getVerification(req, res, next) {
   try {
-    const verification = await verificationService.getVerificationById(req.params.id);
+    const verification = await verificationService.getVerificationById(req.params.id, req.user);
     return successResponse(res, { verification }, 200);
   } catch (err) {
     next(err);
@@ -68,7 +68,7 @@ async function getVerificationEvidence(req, res, next) {
       { $set: { status: 'VERIFIED', evidenceStatus: 'VERIFIED' } }
     );
 
-    const evidence = await verificationService.getEvidenceForVerification(req.params.id);
+    const evidence = await verificationService.getEvidenceForVerification(req.params.id, req.user);
     const normalizedEvidence = evidence.map((record) => {
       const value = typeof record.toJSON === 'function' ? record.toJSON() : { ...record };
       if (value.status === 'PENDING' || value.evidenceStatus === 'PENDING') {

@@ -6,6 +6,9 @@ const auditService = require('./audit.service');
 const notificationService = require('./notification.service');
 const { TRUST_LEVELS, RESULT_TYPES } = require('./verification/verificationConstants');
 const { ValidationError, NotFoundError, ForbiddenError } = require('../utils/errors');
+const Credential = require('../models/credential.model');
+const CredentialVersion = require('../models/credentialVersion.model');
+const User = require('../models/user.model');
 
 const AUTHORIZED_REVIEW_ROLES = ['ADMIN', 'AUDITOR', 'HR'];
 
@@ -46,6 +49,23 @@ class VerificationService {
 
     const evaluation = await verificationEngine.evaluateVerification(input);
 
+    // Bind the verification history to the credential subject, not the verifier.
+    let subjectUserId = null;
+    let candidateEmail = null;
+    let targetCredentialId = input.credentialId || null;
+    if (!targetCredentialId && input.documentHash) {
+      const version = await CredentialVersion.findOne({ documentHash: input.documentHash }).select('credentialId').lean();
+      targetCredentialId = version?.credentialId || null;
+    }
+    const targetCredential = targetCredentialId
+      ? await Credential.findOne({ credentialId: targetCredentialId }).select('recipientId').lean()
+      : null;
+    subjectUserId = targetCredential?.recipientId || (user?.role === 'USER' ? (user.userId || user.id) : null);
+    if (subjectUserId) {
+      const subject = await User.findOne({ userId: subjectUserId }).select('email').lean();
+      candidateEmail = subject?.email || (user?.role === 'USER' && subjectUserId === (user.userId || user.id) ? user.email : null);
+    }
+
     // Phase 9: Determine Cryptographic Status independently
     let cryptographicStatus = 'NOT_APPLICABLE';
     if (evaluation.checks.digitalSignature && evaluation.checks.documentIntegrity) {
@@ -69,6 +89,8 @@ class VerificationService {
       documentId: input.documentId || null,
       documentHash: input.documentHash || null,
       requestedBy: user ? user.userId : 'PUBLIC',
+      subjectUserId,
+      candidateEmail,
       result: evaluation.result,
       trustLevel: evaluation.trustLevel,
       cryptographicStatus,
@@ -348,12 +370,23 @@ class VerificationService {
    * @param {string} verificationId
    * @returns {Promise<object>}
    */
-  async getVerificationById(verificationId) {
-    const record = await Verification.findOne({
+  async getVerificationById(verificationId, user = null) {
+    const idQuery = {
       $or: [
         { verificationId },
         { _id: verificationId.match(/^[0-9a-fA-F]{24}$/) ? verificationId : null }
       ]
+    };
+    if (user?.role === 'USER') {
+      idQuery.$and = [{
+        $or: [
+          { subjectUserId: user.userId || user.id },
+          { candidateEmail: (user.email || '').toLowerCase() }
+        ]
+      }];
+    }
+    const record = await Verification.findOne({
+      ...idQuery
     });
 
     if (!record) {
@@ -368,8 +401,8 @@ class VerificationService {
    * @param {string} verificationId
    * @returns {Promise<object[]>}
    */
-  async getEvidenceForVerification(verificationId) {
-    const record = await this.getVerificationById(verificationId);
+  async getEvidenceForVerification(verificationId, user = null) {
+    const record = await this.getVerificationById(verificationId, user);
     const evidence = await VerificationEvidence.find({
       verificationId: record.verificationId
     }).sort({ createdAt: 1 });
@@ -382,8 +415,14 @@ class VerificationService {
    * @param {object} [filters={}]
    * @returns {Promise<object[]>}
    */
-  async listVerifications(filters = {}) {
+  async listVerifications(filters = {}, user = null) {
     const query = {};
+    if (user?.role === 'USER') {
+      query.$or = [
+        { subjectUserId: user.userId || user.id },
+        { candidateEmail: (user.email || '').toLowerCase() }
+      ];
+    }
     if (filters.credentialId) query.credentialId = filters.credentialId;
     if (filters.result) query.result = filters.result;
     if (filters.finalResult) query.finalResult = filters.finalResult;
@@ -391,7 +430,15 @@ class VerificationService {
     if (filters.humanVerificationStatus) query.humanVerificationStatus = filters.humanVerificationStatus;
 
     const records = await Verification.find(query).sort({ verifiedAt: -1 });
-    return records.map(r => r.toJSON());
+    const credentialIds = [...new Set(records.map((record) => record.credentialId).filter(Boolean))];
+    const credentials = credentialIds.length
+      ? await Credential.find({ credentialId: { $in: credentialIds } }).select('credentialId title').lean()
+      : [];
+    const titleByCredentialId = new Map(credentials.map((credential) => [credential.credentialId, credential.title]));
+    return records.map((record) => ({
+      ...record.toJSON(),
+      credentialTitle: titleByCredentialId.get(record.credentialId) || null
+    }));
   }
 
   /**

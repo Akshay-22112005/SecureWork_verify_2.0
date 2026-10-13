@@ -33,6 +33,18 @@ const VerificationSchema = new mongoose.Schema({
     default: 'PUBLIC',
     index: true
   },
+  subjectUserId: {
+    type: String,
+    default: null,
+    index: true
+  },
+  candidateEmail: {
+    type: String,
+    lowercase: true,
+    trim: true,
+    default: null,
+    index: true
+  },
   result: {
     type: String,
     enum: Object.values(RESULT_TYPES),

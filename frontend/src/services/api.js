@@ -43,7 +43,9 @@ export const api = {
   analysis: {
     upload: (formData) => apiClient('/analysis/upload', { method: 'POST', body: formData }),
     runOcr: (documentId) => apiClient('/analysis/ocr', { method: 'POST', body: { documentId } }),
+    runOcrFile: (formData) => apiClient('/analysis/ocr', { method: 'POST', body: formData }),
     runAi: (documentId) => apiClient('/analysis/document', { method: 'POST', body: { documentId } }),
+    runTamperFile: (formData) => apiClient('/analysis/tamper', { method: 'POST', body: formData }),
     getByDocumentId: (documentId) => apiClient(`/analysis/${documentId}`)
   },
 
@@ -64,6 +66,9 @@ export const api = {
   },
 
   // Verification Engine & Evidence
+  verify: {
+    documentHash: (hash) => apiClient('/verify/document-hash', { method: 'POST', body: { hash } })
+  },
   verifications: {
     evaluate: (input) => apiClient('/verifications/evaluate', { method: 'POST', body: input }),
     list: (params = {}) => {

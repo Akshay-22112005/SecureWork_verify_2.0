@@ -48,7 +48,21 @@ function handleDocumentUpload(req, res, next) {
   });
 }
 
+function handleOptionalDocumentUpload(req, res, next) {
+  documentUploadFields(req, res, (err) => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') {
+        return next(new ValidationError('Uploaded file exceeds the maximum permitted size of 10 MB', 'FILE_TOO_LARGE'));
+      }
+      return next(new ValidationError(err.message, 'UPLOAD_ERROR'));
+    }
+    req.file = (req.files?.file && req.files.file[0]) || (req.files?.document && req.files.document[0]) || null;
+    next();
+  });
+}
+
 module.exports = {
   upload,
-  handleDocumentUpload
+  handleDocumentUpload,
+  handleOptionalDocumentUpload
 };

@@ -22,11 +22,13 @@ const analyticsRoutes = require('./analytics.routes');
 const hrRoutes = require('./hr.routes');
 const adminRoutes = require('./admin.routes');
 const auditRoutes = require('./audit.routes');
+const verifyDocumentHashRoutes = require('./verifyDocumentHash.routes');
 
 const router = express.Router();
 
 // Mount API Route modules
 router.use('/public', publicRoutes);
+router.use('/verify', verifyDocumentHashRoutes);
 router.use('/v1', v1Routes);
 router.use('/api-keys', apiKeyRoutes);
 router.use('/webhooks', webhookRoutes);

@@ -38,6 +38,8 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
   const [publicData, setPublicData] = useState(null);
   const [recordNotFound, setRecordNotFound] = useState(false);
   const [uploadHashToast, setUploadHashToast] = useState('');
+  const [routingToast, setRoutingToast] = useState(location?.state?.routingNotice || '');
+  const [hashMatch, setHashMatch] = useState(null);
   const [tamperingSimulated, setTamperingSimulated] = useState(false);
   const [tamperLoading, setTamperLoading] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -177,15 +179,36 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
   }
 
   useEffect(() => {
+    if (!routingToast) return undefined;
+    const timer = window.setTimeout(() => setRoutingToast(''), 3000);
+    return () => window.clearTimeout(timer);
+  }, [routingToast]);
+
+  useEffect(() => {
     if (effectiveCredId) {
       setCredentialId(effectiveCredId);
       setActiveTab('direct');
+      setHashMatch(null);
     }
     if (effectiveDocHash) setDocumentHash(effectiveDocHash);
     if (effectiveDocId) setDocumentId(effectiveDocId);
 
-    if (effectiveCredId || effectiveDocHash) {
+    if (effectiveCredId) {
       executeEvaluation(effectiveCredId, effectiveDocHash, effectiveDocId);
+    } else if (effectiveDocHash) {
+      setHashMatch(null);
+      (async () => {
+        try {
+          const lookup = await api.verify.documentHash(effectiveDocHash);
+          const match = lookup?.data || lookup;
+          setHashMatch(match?.matchedOrganization ? match : { matchedOrganization: null });
+          if (match?.credentialId) setCredentialId(match.credentialId);
+          await executeEvaluation(match?.credentialId || '', effectiveDocHash, effectiveDocId);
+        } catch {
+          setHashMatch({ matchedOrganization: null });
+          await executeEvaluation('', effectiveDocHash, effectiveDocId);
+        }
+      })();
     }
   }, [effectiveCredId, effectiveDocHash, effectiveDocId]);
 
@@ -208,11 +231,16 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
       });
       const digest = await window.crypto.subtle.digest('SHA-256', fileBytes);
       const hash = Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+      setHashMatch(null);
       setCredentialId('');
       setDocumentId('');
       setDocumentHash(hash);
       setUploadHashToast(`Calculated File SHA-256: ${hash.slice(0, 20)}...`);
-      await executeEvaluation('', hash, '');
+      const lookup = await api.verify.documentHash(hash);
+      const match = lookup?.data || lookup;
+      setHashMatch(match?.matchedOrganization ? match : { matchedOrganization: null });
+      if (match?.credentialId) setCredentialId(match.credentialId);
+      await executeEvaluation(match?.credentialId || '', hash, '');
     } catch (err) {
       setError(err.message || 'Unable to calculate the document hash.');
     }
@@ -333,6 +361,12 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
           </div>
         )}
       </div>
+
+      {routingToast && (
+        <div role="status" className="alert-banner neutral" style={{ position: 'fixed', right: '1.5rem', bottom: '1.5rem', zIndex: 1000, boxShadow: '0 8px 24px rgba(0,0,0,.25)' }}>
+          <Check size={16} /> <span>{routingToast}</span>
+        </div>
+      )}
 
       {/* ─── TAB 1: HR CANDIDATE LOOKUP FLOW ─── */}
       {activeTab === 'hr_candidate' && (
@@ -811,6 +845,30 @@ export default function VerifyDocument({ initialParams = {}, onNavigate }) {
       )}
 
       {/* Categorical Trust Evidence Results */}
+      {hashMatch && (
+        <section
+          className="glass-card"
+          role={hashMatch.matchedOrganization ? 'status' : 'alert'}
+          aria-live="polite"
+          style={{ marginBottom: '1rem', border: `1px solid ${hashMatch.matchedOrganization ? 'rgba(16,185,129,.4)' : 'rgba(239,68,68,.4)'}` }}
+        >
+          {hashMatch.matchedOrganization ? (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+              <div>
+                <h3 style={{ margin: '0 0 .35rem' }}>Issuing Organization Resolved</h3>
+                <div>Verified Source: <strong>{hashMatch.matchedOrganization.name}</strong> (Domain: {hashMatch.matchedOrganization.domain || 'unavailable'})</div>
+                {hashMatch.credentialId && <div className="text-muted text-xs" style={{ marginTop: '.35rem' }}>Credential ID: {hashMatch.credentialId}</div>}
+              </div>
+              <span className="level-badge" style={{ background: 'rgba(16,185,129,.15)', color: '#10b981', borderColor: 'rgba(16,185,129,.4)' }}>TRUSTED ANCHOR</span>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '.6rem', color: '#ef4444' }}>
+              <AlertCircle size={18} />
+              <div><strong>Unregistered Document Hash:</strong> No matching entry in official registry</div>
+            </div>
+          )}
+        </section>
+      )}
       {verificationResult && (
         <div>
           <TrustEvidenceCard verification={verificationResult} />
