@@ -96,7 +96,14 @@ function validateEnv(envSource = process.env) {
   const CLOUDINARY_CLOUD_NAME = envSource.CLOUDINARY_CLOUD_NAME || '';
   const CLOUDINARY_API_KEY = envSource.CLOUDINARY_API_KEY || '';
   const CLOUDINARY_API_SECRET = envSource.CLOUDINARY_API_SECRET || '';
-  const CLOUDINARY_FOLDER = envSource.CLOUDINARY_FOLDER || 'securework-verify';
+  const CLOUDINARY_FOLDER = envSource.CLOUDINARY_FOLDER || 'securework_verify';
+
+  const SMTP_HOST = envSource.SMTP_HOST || 'smtp.gmail.com';
+  const SMTP_PORT = parseInt(envSource.SMTP_PORT || '587', 10);
+  const SMTP_SECURE = parseBool(envSource.SMTP_SECURE, false);
+  const SMTP_USER = envSource.SMTP_USER || '';
+  const SMTP_PASS = envSource.SMTP_PASS || '';
+  const SMTP_FROM = envSource.SMTP_FROM || envSource.SMTP_USER || '"SecureWork Verify" <no-reply@securework.io>';
 
   if (errors.length > 0) {
     const errorMsg = `Environment Configuration Validation Failed:\n  - ${errors.join('\n  - ')}`;
@@ -123,6 +130,12 @@ function validateEnv(envSource = process.env) {
     CLOUDINARY_API_KEY,
     CLOUDINARY_API_SECRET,
     CLOUDINARY_FOLDER,
+    SMTP_HOST,
+    SMTP_PORT,
+    SMTP_SECURE: Boolean(SMTP_SECURE),
+    SMTP_USER,
+    SMTP_PASS,
+    SMTP_FROM,
     IS_PRODUCTION: NODE_ENV === 'production',
     IS_TEST: NODE_ENV === 'test',
     IS_DEVELOPMENT: NODE_ENV === 'development'

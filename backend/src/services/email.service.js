@@ -13,13 +13,13 @@ class EmailService {
   }
 
   async _initTransporter() {
-    const smtpUser = process.env.SMTP_USER;
-    const smtpPass = process.env.SMTP_PASS;
+    const smtpUser = env.SMTP_USER || process.env.SMTP_USER;
+    const smtpPass = env.SMTP_PASS || process.env.SMTP_PASS;
     if (smtpUser && smtpPass) {
       this.transporter = nodemailer.createTransport({
-        host: process.env.SMTP_HOST || 'smtp.gmail.com',
-        port: parseInt(process.env.SMTP_PORT || '587', 10),
-        secure: process.env.SMTP_SECURE === 'true',
+        host: env.SMTP_HOST || process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: env.SMTP_PORT || parseInt(process.env.SMTP_PORT || '587', 10),
+        secure: env.SMTP_SECURE,
         connectionTimeout: 8000,
         greetingTimeout: 8000,
         socketTimeout: 12000,

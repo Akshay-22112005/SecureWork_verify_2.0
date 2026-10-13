@@ -46,6 +46,24 @@ mongoose.connection.on('reconnected', () => {
 
 let retryTimer = null;
 
+let primaryConnectionFailed = false;
+
+const dns = require('dns');
+
+/**
+ * Configure public DNS fallback for MongoDB Atlas SRV connection strings.
+ * On Windows, local router/ISP DNS resolvers often fail SRV queries with querySrv ECONNREFUSED.
+ */
+function configureDnsForSrv(uri) {
+  if (uri && (uri.startsWith('mongodb+srv://') || uri.includes('+srv'))) {
+    try {
+      dns.setServers(['8.8.8.8', '1.1.1.1', '8.8.4.4']);
+    } catch {
+      // Ignore if unsupported in environment
+    }
+  }
+}
+
 /**
  * Checks if a MongoDB URI contains placeholder tokens.
  */
@@ -86,9 +104,11 @@ async function connectDB(uri = env.MONGODB_URI) {
   dbState.status = 'connecting';
   let targetUri = uri;
 
-  // 1. If configured URI has un-substituted placeholders, skip directly to fallback
-  if (isPlaceholderUri(targetUri)) {
-    logger.info('MONGODB_URI contains placeholder credentials. Attempting local daemon or memory-server fallback...');
+  // 1. If configured URI has un-substituted placeholders or failed previously in test mode, skip to fallback
+  if (isPlaceholderUri(targetUri) || (primaryConnectionFailed && env.IS_TEST)) {
+    if (!primaryConnectionFailed) {
+      logger.info('MONGODB_URI contains placeholder credentials. Attempting local daemon or memory-server fallback...');
+    }
     // Try local MongoDB first, otherwise memory server
     try {
       const localUri = 'mongodb://127.0.0.1:27017/securework_verify';
@@ -125,9 +145,11 @@ async function connectDB(uri = env.MONGODB_URI) {
 
   // 2. Try the primary URI (e.g. Atlas or configured URI)
   try {
+    configureDnsForSrv(targetUri);
     const conn = await mongoose.connect(targetUri, {
-      serverSelectionTimeoutMS: 5000,
-      connectTimeoutMS: 10000
+      serverSelectionTimeoutMS: 4000,
+      connectTimeoutMS: 6000,
+      dbName: 'securework_verify'
     });
 
     activeUri = targetUri;
@@ -137,6 +159,7 @@ async function connectDB(uri = env.MONGODB_URI) {
     dbState.name = conn.connection.name;
     dbState.isMemoryServer = false;
     dbState.error = null;
+    primaryConnectionFailed = false;
 
     if (retryTimer) {
       clearInterval(retryTimer);
@@ -146,7 +169,13 @@ async function connectDB(uri = env.MONGODB_URI) {
     logger.info(`MongoDB connected successfully to ${dbState.host}/${dbState.name}`);
     return conn;
   } catch (err) {
-    logger.warn(`Primary MongoDB connection failed (${err.message}). Attempting fallback...`);
+    primaryConnectionFailed = true;
+    const isAtlas = targetUri && (targetUri.includes('mongodb.net') || targetUri.startsWith('mongodb+srv://'));
+    if (isAtlas) {
+      logger.warn(`Primary MongoDB Atlas connection failed (${err.message}). If using MongoDB Atlas, make sure your IP is whitelisted (or 0.0.0.0/0 allowed) in Atlas Network Access. Attempting fallback...`);
+    } else {
+      logger.warn(`Primary MongoDB connection failed (${err.message}). Attempting fallback...`);
+    }
 
     // Fallback: Try local or in-memory
     try {

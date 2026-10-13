@@ -48,6 +48,34 @@ class CloudinaryAdapter extends StorageAdapter {
   }
 
   /**
+   * Parse Cloudinary storage pointer into resourceType, format, and publicId.
+   * Supports both new structured format "cloudinary:{resourceType}:{format}:{publicId}"
+   * and legacy format "cloudinary:{publicId}".
+   * @param {string} storagePath
+   * @returns {{ resourceType: string, format: string, publicId: string } | null}
+   */
+  _parseStoragePath(storagePath) {
+    if (!storagePath || typeof storagePath !== 'string') return null;
+    const stripped = storagePath.replace(/^cloudinary:/, '');
+    const parts = stripped.split(':');
+    if (parts.length >= 3) {
+      const resourceType = parts[0];
+      const format = parts[1] === 'none' ? '' : parts[1];
+      const publicId = parts.slice(2).join(':');
+      return { resourceType, format, publicId };
+    }
+
+    // Legacy format fallback: cloudinary:publicId
+    const ext = path.extname(stripped).replace(/^\./, '').toLowerCase();
+    const isImageOrPdf = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'pdf', 'svg'].includes(ext);
+    return {
+      resourceType: isImageOrPdf ? 'image' : 'raw',
+      format: ext || '',
+      publicId: stripped
+    };
+  }
+
+  /**
    * Upload file to Cloudinary with authenticated/private access.
    * @param {Buffer} fileBuffer
    * @param {string} originalFilename
@@ -65,36 +93,58 @@ class CloudinaryAdapter extends StorageAdapter {
 
     const sha256Hash = sha256(fileBuffer);
     const fileSize = fileBuffer.length;
-    const ext = path.extname(originalFilename).toLowerCase() || '.bin';
+    const ext = path.extname(originalFilename || '').toLowerCase();
+    const cleanExt = ext.replace(/^\./, '');
+    const isImageOrPdf = (mimeType && (mimeType.startsWith('image/') || mimeType === 'application/pdf')) ||
+                         ['jpg', 'jpeg', 'png', 'webp', 'gif', 'pdf', 'svg'].includes(cleanExt);
+    const primaryResourceType = isImageOrPdf ? 'image' : 'raw';
     const publicId = `${this.folder}/${sha256Hash.slice(0, 16)}_${Date.now()}`;
 
-    return new Promise((resolve, reject) => {
-      const uploadStream = cloudinary.uploader.upload_stream(
-        {
-          public_id: publicId,
-          resource_type: 'auto',
-          type: 'authenticated', // Authenticated private delivery
-          format: ext.replace(/^\./, '') || undefined,
-          tags: ['securework_verify', 'document']
-        },
-        (error, result) => {
-          if (error) {
-            logger.error('Cloudinary upload error, falling back to local storage', { error: error.message });
-            return this.fallbackAdapter.uploadFile(fileBuffer, originalFilename, mimeType)
-              .then(resolve)
-              .catch(reject);
+    const uploadStreamPromise = (resType) => {
+      return new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            public_id: publicId,
+            resource_type: resType,
+            type: 'authenticated', // Authenticated private delivery
+            format: cleanExt || undefined,
+            tags: ['securework_verify', 'document']
+          },
+          (error, result) => {
+            if (error) return reject(error);
+            resolve(result);
           }
+        );
+        uploadStream.end(fileBuffer);
+      });
+    };
 
-          resolve({
-            storagePath: `cloudinary:${result.public_id}`,
-            fileSize: result.bytes || fileSize,
-            sha256Hash
-          });
+    try {
+      let result;
+      try {
+        result = await uploadStreamPromise(primaryResourceType);
+      } catch (uploadErr) {
+        // If image upload failed (e.g. invalid PDF/image structure), retry as raw
+        if (primaryResourceType === 'image') {
+          logger.warn(`Cloudinary image upload failed (${uploadErr.message}), retrying as raw asset...`);
+          result = await uploadStreamPromise('raw');
+        } else {
+          throw uploadErr;
         }
-      );
+      }
 
-      uploadStream.end(fileBuffer);
-    });
+      const resType = result.resource_type || primaryResourceType;
+      const resFormat = result.format || cleanExt || 'none';
+
+      return {
+        storagePath: `cloudinary:${resType}:${resFormat}:${result.public_id}`,
+        fileSize: result.bytes || fileSize,
+        sha256Hash
+      };
+    } catch (error) {
+      logger.error('Cloudinary upload error, falling back to local storage', { error: error.message });
+      return this.fallbackAdapter.uploadFile(fileBuffer, originalFilename, mimeType);
+    }
   }
 
   /**
@@ -115,29 +165,57 @@ class CloudinaryAdapter extends StorageAdapter {
       throw new NotFoundError('Cloudinary driver not configured to resolve remote storage pointer');
     }
 
-    const publicId = storagePath.replace(/^cloudinary:/, '');
-    const signedUrl = this.getSignedUrl(publicId);
+    const parsed = this._parseStoragePath(storagePath);
+    if (!parsed) {
+      throw new ValidationError('Malformed Cloudinary storage path');
+    }
 
-    const buffer = await this._downloadBuffer(signedUrl);
-    return buffer;
+    const { resourceType, format, publicId } = parsed;
+    const signedUrl = this.getSignedUrl(storagePath);
+
+    try {
+      const buffer = await this._downloadBuffer(signedUrl);
+      return buffer;
+    } catch (err) {
+      // If download failed (e.g. 404), attempt alternate resource type (image <-> raw)
+      const altResourceType = resourceType === 'image' ? 'raw' : 'image';
+      const altUrl = cloudinary.utils.private_download_url(publicId, altResourceType === 'raw' ? '' : (format || ''), {
+        resource_type: altResourceType,
+        type: 'authenticated',
+        expires_at: Math.floor(Date.now() / 1000) + 3600
+      });
+
+      try {
+        const altBuffer = await this._downloadBuffer(altUrl);
+        return altBuffer;
+      } catch {
+        throw err;
+      }
+    }
   }
 
   /**
    * Generate an authenticated/signed private download URL.
-   * @param {string} publicId
+   * @param {string} storagePathOrPublicId
    * @param {number} [expiresInSeconds=3600]
    * @returns {string} Signed download URL
    */
-  getSignedUrl(publicId, expiresInSeconds = 3600) {
-    const cleanPublicId = publicId.replace(/^cloudinary:/, '');
+  getSignedUrl(storagePathOrPublicId, expiresInSeconds = 3600) {
+    const parsed = this._parseStoragePath(storagePathOrPublicId);
+    if (!parsed) return '';
+
+    const { resourceType, format, publicId } = parsed;
     const expiresAt = Math.floor(Date.now() / 1000) + expiresInSeconds;
-    return cloudinary.utils.private_download_url(cleanPublicId, '', {
-      resource_type: 'raw',
+
+    return cloudinary.utils.private_download_url(publicId, format || '', {
+      resource_type: resourceType,
       type: 'authenticated',
       expires_at: expiresAt
-    }) || cloudinary.url(cleanPublicId, {
+    }) || cloudinary.url(publicId, {
       sign_url: true,
       type: 'authenticated',
+      resource_type: resourceType,
+      format: format || undefined,
       secure: true
     });
   }
@@ -154,13 +232,24 @@ class CloudinaryAdapter extends StorageAdapter {
 
     if (!this.isConfigured) return false;
 
-    const publicId = storagePath.replace(/^cloudinary:/, '');
+    const parsed = this._parseStoragePath(storagePath);
+    if (!parsed) return false;
+
+    const { resourceType, publicId } = parsed;
     try {
-      const res = await cloudinary.uploader.destroy(publicId, {
+      let res = await cloudinary.uploader.destroy(publicId, {
         type: 'authenticated',
-        resource_type: 'raw'
+        resource_type: resourceType
       });
-      return res.result === 'ok';
+      if (res && res.result === 'ok') return true;
+
+      // Try alternate resource type if not ok
+      const altResourceType = resourceType === 'image' ? 'raw' : 'image';
+      res = await cloudinary.uploader.destroy(publicId, {
+        type: 'authenticated',
+        resource_type: altResourceType
+      });
+      return res && res.result === 'ok';
     } catch (err) {
       logger.error('Cloudinary delete error', { error: err.message, publicId });
       return false;
@@ -181,7 +270,10 @@ class CloudinaryAdapter extends StorageAdapter {
     if (!fs.existsSync(this.tempDir)) {
       fs.mkdirSync(this.tempDir, { recursive: true });
     }
-    const tempFilePath = path.join(this.tempDir, `stream_${Date.now()}_${path.basename(storagePath)}`);
+    const parsed = this._parseStoragePath(storagePath);
+    const ext = parsed && parsed.format ? `.${parsed.format}` : '';
+    const tempFileName = `stream_${Date.now()}_${path.basename(parsed ? parsed.publicId : storagePath)}${ext}`;
+    const tempFilePath = path.join(this.tempDir, tempFileName);
     await fs.promises.writeFile(tempFilePath, buffer);
     return tempFilePath;
   }
